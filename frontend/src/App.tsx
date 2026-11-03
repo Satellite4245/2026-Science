@@ -215,7 +215,17 @@ export function App() {
   const triggerTotalMeltdown = () => {
     triggerCatastrophicSequence();
     addLog('🚨 [CORE MELTDOWN] 과열 위험도 100% 도달! 챔버 원소들이 격렬히 폭발하며 소실되었습니다!', 'danger');
-    setChamber([]);
+    
+    // 만약 레벨 목표가 코어 멜트다운이라면 인벤토리 및 챔버에 코어 멜트다운 생성
+    if (currentStage.target === '코어 멜트다운') {
+      setChamber(['코어 멜트다운']);
+      if (!inventory.includes('코어 멜트다운')) {
+        setInventory((prev) => [...prev, '코어 멜트다운']);
+      }
+      bumpCombo();
+    } else {
+      setChamber([]);
+    }
     setHeat(0);
   };
 

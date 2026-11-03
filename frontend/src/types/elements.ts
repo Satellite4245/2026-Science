@@ -41,6 +41,7 @@ export const ELEMENT_STYLES: Record<string, ElementStyle> = {
   "알칼리 폭발재": { symbol: "🔥💥", sub: "NaOH+H₂ Gas", size: 84, bg: "radial-gradient(circle at 35% 35%, #ffedd5 0%, #f97316 60%, #7c2d12 100%)", border: "#ea580c", textColor: "#fff" },
   "초고온 수증기": { symbol: "💨⚡", sub: "Superheated Gas", size: 84, bg: "radial-gradient(circle at 35% 35%, #e0f2fe 0%, #0284c7 60%, #0c4a6e 100%)", border: "#0ea5e9", textColor: "#fff" },
   "반물질 잔해": { symbol: "🌀", sub: "Dark Matter Void", size: 88, bg: "radial-gradient(circle at 35% 35%, #f3e8ff 0%, #7e22ce 60%, #3b0764 100%)", border: "#a855f7", textColor: "#fff" },
+  "코어 멜트다운": { symbol: "🚨💥", sub: "Meltdown Core", size: 98, bg: "radial-gradient(circle at 35% 35%, #fecaca 0%, #dc2626 60%, #450a0a 100%)", border: "#b91c1c", textColor: "#fff" },
 };
 
 export const ATOMIC_REGISTRY: Record<string, string> = {
@@ -91,6 +92,24 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       desc: "탄소와 산소로 이산화탄소를, 산소와 수소로 물을 만드세요. 탄소에 열에너지를 가해 얻은 빛 에너지로 광합성을 진행하세요.",
       constraint: "⚠️ 제한사항: 탄소, 수소, 산소를 섞어 포도당을 직접 합성할 수 없습니다.",
       items: ["탄소", "산소", "수소", "열에너지"]
+    },
+    {
+      level: 4,
+      name: "[폭발 실험 1] 알칼리 금속 수용액 폭발",
+      target: "알칼리 폭발재",
+      timeLimit: 90,
+      desc: "활성이 극도로 높은 알칼리 금속인 나트륨을 물에 직접 투입하여 연쇄 수소 연소 폭발을 유도하세요.",
+      constraint: "🔥 나트륨(Na) + 물(H₂O) → 격렬 화염 폭발 (위험도 +35%)",
+      items: ["나트륨", "물", "염소"]
+    },
+    {
+      level: 5,
+      name: "[폭발 실험 2] 수소 폭명기 점화 폭발",
+      target: "초고온 수증기",
+      timeLimit: 90,
+      desc: "수소와 산소 기체 혼합물에 열에너지를 가해 쾅 터지는 음속 충격파 반응을 일으키고 초고온 수증기를 포집하세요.",
+      constraint: "⚡ 수소(H) + 산소(O) + 열에너지(🔥) → 폭명기 점화 폭발 (위험도 +45%)",
+      items: ["수소", "산소", "열에너지"]
     }
   ],
   HARDCORE: [
@@ -129,7 +148,24 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       desc: "소립자를 정확히 조합하여 우라늄-235를 합성하고, 중성자를 충돌시켜 임계질량을 초과한 핵분열 반응을 유도하세요.",
       constraint: "⚠️ 제약조건: 전자 충돌 핵분열 금지. 우라늄 규격: 양성자 143개, 중성자 92개, 전자 92개.",
       items: ["양성자", "중성자", "전자"]
+    },
+    {
+      level: 5,
+      name: "[하드코어] 시공간 왜곡 반물질 쌍소멸",
+      target: "반물질 잔해",
+      timeLimit: 150,
+      desc: "소립자들을 극고온 열에너지 상태에서 충돌시켜 쌍소멸 왜곡 글리치 폭발을 일으키고 반물질 잔해를 수거하세요.",
+      constraint: "🌀 양성자 + 전자 + 열에너지 → 시공간 왜곡 폭발 (위험도 +50%)",
+      items: ["양성자", "중성자", "전자", "열에너지"]
+    },
+    {
+      level: 6,
+      name: "[최종 보스] 챔버 오버드라이브 멜트다운",
+      target: "코어 멜트다운",
+      timeLimit: 90,
+      desc: "챔버 위험도(CORE STABILITY)를 폭발 반응 콤보로 100%까지 폭주시추어 연구실 방폭 격벽을 완전 붕괴시키세요!",
+      constraint: "🚨 알칼리 폭발/수소 폭음/핵분열 등 연속 폭발로 위험도 100% 도달 필수",
+      items: ["양성자", "중성자", "전자", "열에너지"]
     }
   ]
 };
-
