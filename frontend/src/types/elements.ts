@@ -42,6 +42,7 @@ export const ELEMENT_STYLES: Record<string, ElementStyle> = {
   "초고온 수증기": { symbol: "💨⚡", sub: "Superheated Gas", size: 84, bg: "radial-gradient(circle at 35% 35%, #e0f2fe 0%, #0284c7 60%, #0c4a6e 100%)", border: "#0ea5e9", textColor: "#fff" },
   "반물질 잔해": { symbol: "🌀", sub: "Dark Matter Void", size: 88, bg: "radial-gradient(circle at 35% 35%, #f3e8ff 0%, #7e22ce 60%, #3b0764 100%)", border: "#a855f7", textColor: "#fff" },
   "코어 멜트다운": { symbol: "🚨💥", sub: "Meltdown Core", size: 98, bg: "radial-gradient(circle at 35% 35%, #fecaca 0%, #dc2626 60%, #450a0a 100%)", border: "#b91c1c", textColor: "#fff" },
+  "25콤보 마스터": { symbol: "👑25x", sub: "Combo Master", size: 98, bg: "radial-gradient(circle at 35% 35%, #fef08a 0%, #eab308 60%, #713f12 100%)", border: "#ca8a04", textColor: "#fff" },
 };
 
 export const ATOMIC_REGISTRY: Record<string, string> = {
@@ -63,6 +64,11 @@ export interface Stage {
   constraint: string;
   items: string[];
 }
+
+export const ALL_ITEMS_POOL = [
+  "수소", "산소", "탄소", "나트륨", "염소", "수소 이온", "수산화 이온",
+  "물", "염화나트륨", "염산", "수산화나트륨", "이산화탄소", "열에너지", "빛 에너지"
+];
 
 export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
   NORMAL: [
@@ -95,12 +101,12 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
     },
     {
       level: 4,
-      name: "[폭발 실험 1] 알칼리 금속 수용액 폭발",
+      name: "[폭발 실험 1] 물 직접 합성 및 알칼리 폭발",
       target: "알칼리 폭발재",
-      timeLimit: 90,
-      desc: "활성이 극도로 높은 알칼리 금속인 나트륨을 물에 직접 투입하여 연쇄 수소 연소 폭발을 유도하세요.",
-      constraint: "🔥 나트륨(Na) + 물(H₂O) → 격렬 화염 폭발 (위험도 +35%)",
-      items: ["나트륨", "물", "염소"]
+      timeLimit: 120,
+      desc: "물(H₂O)을 완제품으로 주지 않습니다! 수소와 산소를 반응시켜 물을 직접 합성한 뒤, 나트륨과 격렬히 반응시켜 알칼리 폭발을 일으키세요.",
+      constraint: "💧 [수소 + 산소 → 물] 직접 합성 필수 ➔ 나트륨(Na) + 물(H₂O) 화염 폭발 유도!",
+      items: ["수소", "산소", "나트륨"]
     },
     {
       level: 5,
@@ -110,6 +116,15 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       desc: "수소와 산소 기체 혼합물에 열에너지를 가해 쾅 터지는 음속 충격파 반응을 일으키고 초고온 수증기를 포집하세요.",
       constraint: "⚡ 수소(H) + 산소(O) + 열에너지(🔥) → 폭명기 점화 폭발 (위험도 +45%)",
       items: ["수소", "산소", "열에너지"]
+    },
+    {
+      level: 6,
+      name: "[궁극의 챌린지] 25콤보 무한 연쇄 합성",
+      target: "25콤보 마스터",
+      timeLimit: 180,
+      desc: "모든 기초 원소와 반응물이 무제한 지급됩니다. 반응을 끊임없이 연속 실행하여 '25 COMBO'에 도달하세요!",
+      constraint: "👑 연속 콤보 25회 달성 시 25콤보 마스터 획득 및 연구 성공!",
+      items: ALL_ITEMS_POOL
     }
   ],
   HARDCORE: [

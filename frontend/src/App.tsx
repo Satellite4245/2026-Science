@@ -177,10 +177,20 @@ export function App() {
     ];
     setComboText(comboMessages[Math.min(nextCombo, 5)] || `⚡ x${nextCombo} CHAIN COMBO!`);
 
+    // 만약 25콤보 목표 스테이지에서 25콤보 달성 시
+    if (nextCombo >= 25 && currentStage.target === '25콤보 마스터') {
+      if (!inventory.includes('25콤보 마스터')) {
+        setInventory((prev) => [...prev, '25콤보 마스터']);
+      }
+      setChamber((prev) => [...prev, '25콤보 마스터']);
+      addLog('👑 [25 COMBO MASTER] 25콤보 돌파! 궁극의 콤보 마스터 원소가 챔버에 강림했습니다!', 'success');
+      confetti({ particleCount: 200, spread: 180, origin: { y: 0.5 } });
+    }
+
     comboTimerRef.current = setTimeout(() => {
       setCombo(0);
       setComboText(null);
-    }, 4500);
+    }, 6000); // 콤보 여유시간 6초로 상향
   };
 
   // 대폭발 & 방폭 차폐막 파손 시퀀스 (핵폭발 or 멜트다운 100%)
