@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-dark: #070b13;
+  --color-bg-panel: #0d1527;
+  --color-bg-card: #15223c;
+  --color-border-subtle: #203358;
+}
+
+@keyframes quake {
+  0% { transform: translate(-10px, 8px) rotate(-1deg); }
+  25% { transform: translate(12px, -9px) rotate(1.2deg); }
+  50% { transform: translate(-8px, -11px) rotate(-1.5deg); }
+  75% { transform: translate(11px, 9px) rotate(1deg); }
+  100% { transform: translate(-7px, 6px) rotate(-0.7deg); }
+}
+
+@keyframes light-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 4px); }
+  40% { transform: translate(4px, -3px); }
+  60% { transform: translate(-3px, -2px); }
+  80% { transform: translate(3px, 2px); }
+}
+
+.quake-active {
+  animation: quake 0.05s infinite alternate !important;
+}
+
+.shake-active {
+  animation: light-shake 0.15s ease-in-out 2;
+}
+
+@keyframes flash-burst {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.flash-screen {
+  animation: flash-burst 0.8s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+.screen-cracks {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 1000'%3E%3Cpath d='M500 500 L180 120 L90 380 L30 750 M500 500 L860 170 L720 420 L970 780 M500 500 L440 920 L220 960 M500 500 L590 80 M500 500 L320 430 L150 560 M500 500 L680 580 L840 520 M500 500 L410 320 M500 500 L620 370' stroke='rgba(255,255,255,0.85)' stroke-width='3' stroke-linecap='round' fill='none'/%3E%3Ccircle cx='500' cy='500' r='18' fill='none' stroke='rgba(255,255,255,0.9)' stroke-width='4'/%3E%3Ccircle cx='500' cy='500' r='55' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2' stroke-dasharray='12,8'/%3E%3C/svg%3E") center/cover no-repeat;
+  filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.9));
+}
