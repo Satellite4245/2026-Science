@@ -38,12 +38,12 @@ export const CodexModal: React.FC<CodexModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           <div className="bg-slate-900/70 p-3 rounded-xl border border-slate-800 flex flex-col gap-1">
-            <div className="font-bold text-white">3. 산·염기 및 중화 반응</div>
+            <div className="font-bold text-white">4. 이산화탄소 & 물 합성 (화학 계수 준수)</div>
             <div className="text-cyan-300 font-mono text-xs">
-              H⁺ + Cl → HCl | Na + OH⁻ → NaOH<br />
-              HCl + NaOH → H₂O + NaCl
+              C + 2O → CO₂ (탄소 1 + 산소 2)<br />
+              2H + O → H₂O (수소 2 + 산소 1)
             </div>
-            <div className="text-slate-400 text-xs">산과 염기가 중화되어 물과 염을 형성합니다.</div>
+            <div className="text-slate-400 text-xs">화학양론적 원자 개수를 정확히 맞춰야 온전한 분자로 결합합니다. (부족 시 일산화탄소 불안정 혹은 수산화 이온 형성)</div>
           </div>
 
           <div className="text-xs font-bold text-rose-400 uppercase tracking-wider mt-2">🔥 고에너지 폭발 & 멜트다운 반응</div>

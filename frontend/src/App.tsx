@@ -315,15 +315,20 @@ export function App() {
     }
 
     // ----------------------------------------------------
-    // [폭발 반응 3] 수소 + 산소 + 열에너지 = 수소 폭명기 점화 폭발
+    // [폭발 반응 3] 수소 2개 + 산소 1개 + 열에너지 = 수소 폭명기 점화 폭발 (2H + O + Heat -> H2O steam)
     // ----------------------------------------------------
-    if (count('수소') >= 1 && count('산소') >= 1 && count('열에너지') >= 1) {
-      replaceChamber(['수소', '산소', '열에너지'], ['초고온 수증기']);
+    if (count('수소') >= 2 && count('산소') >= 1 && count('열에너지') >= 1) {
+      replaceChamber(['수소', '수소', '산소', '열에너지'], ['초고온 수증기']);
       sound.playExplosion('medium');
       triggerImpactEffect('hydrogen');
       setHeat((prev) => Math.min(100, prev + 45));
       bumpCombo();
-      addLog('⚡💥 [수소 폭명기 폭발] 열에너지에 의해 수소-산소 혼합 기체가 점화되어 강력한 충격파를 일으켰습니다!', 'danger');
+      addLog('⚡💥 [수소 폭명기 폭발] 2H + O + 열에너지 점화로 강력한 충격파를 일으켰습니다!', 'danger');
+      return;
+    } else if (count('수소') >= 1 && count('산소') >= 1 && count('열에너지') >= 1) {
+      // 수소가 1개뿐일 때 친절한 화학양론 안내
+      sound.playFail();
+      addLog('⚠️ 화학양론 불균형: 수소 폭명기 반응(2H + O)을 일으키려면 수소(H)가 2개 필요합니다!', 'warning');
       return;
     }
 
@@ -392,34 +397,40 @@ export function App() {
       return;
     }
 
-    // [일반 화학 반응 6] 수소 + 산소 -> 수산화 이온
+    // [일반 화학 반응 6] 수소 + 산소 -> 수산화 이온 (1:1)
     if (count('수소') === 1 && count('산소') === 1 && chamber.length === 2) {
       replaceChamber(['수소', '산소'], ['수산화 이온']);
       triggerImpactEffect('normal');
       bumpCombo();
-      addLog('✨ 수소와 산소가 결합하여 수산화 이온(OH⁻)을 형성하였습니다.', 'success');
+      addLog('✨ 수소(H) 1개와 산소(O) 1개가 결합하여 수산화 이온(OH⁻)을 형성하였습니다.', 'success');
       return;
     }
 
-    // [일반 화학 반응 7] 산소 + 수소 -> 물
-    if ((count('산소') >= 1 && count('수소') >= 2) || (count('산소') >= 1 && count('수소') >= 1 && chamber.length === 2)) {
-      if (count('수소') >= 2) {
-        replaceChamber(['산소', '수소', '수소'], ['물']);
-      } else {
-        replaceChamber(['산소', '수소'], ['물']);
-      }
+    // [일반 화학 반응 7] 수소 2개 + 산소 1개 -> 물 (2H + O -> H2O 화학 반응식 계수 엄격 준수)
+    if (count('수소') >= 2 && count('산소') >= 1) {
+      replaceChamber(['수소', '수소', '산소'], ['물']);
       triggerImpactEffect('normal');
       bumpCombo();
-      addLog('💧 [공유결합] 수소와 산소가 반응하여 순수한 물(H₂O)이 합성되었습니다.', 'success');
+      addLog('💧 [공유결합] 2H + O → H₂O 수소 2개와 산소 1개가 반응하여 물 분자가 합성되었습니다.', 'success');
+      return;
+    } else if (count('수소') === 1 && count('산소') >= 1 && chamber.length >= 2 && !chamber.includes('열에너지')) {
+      // 수소가 1개 부족한 경우 화학양론 안내
+      sound.playFail();
+      addLog('⚠️ 화학양론 불균형: 물(H₂O)을 합성하려면 수소(H)가 2개 필요합니다! (현재 수소 1개)', 'warning');
       return;
     }
 
-    // [일반 화학 반응 8] 탄소 + 산소 -> 이산화탄소
-    if (count('탄소') >= 1 && count('산소') >= 1) {
-      replaceChamber(['탄소', '산소'], ['이산화탄소']);
+    // [일반 화학 반응 8] 탄소 1개 + 산소 2개 -> 이산화탄소 (C + 2O -> CO2 화학 반응식 계수 엄격 준수)
+    if (count('탄소') >= 1 && count('산소') >= 2) {
+      replaceChamber(['탄소', '산소', '산소'], ['이산화탄소']);
       triggerImpactEffect('normal');
       bumpCombo();
-      addLog('💨 [산화반응] 탄소가 산화되어 이산화탄소(CO₂) 기체 생성!', 'success');
+      addLog('💨 [산화반응] C + 2O → CO₂ 탄소 1개와 산소 2개가 반응하여 이산화탄소가 생성되었습니다!', 'success');
+      return;
+    } else if (count('탄소') >= 1 && count('산소') === 1 && !chamber.includes('열에너지')) {
+      // 산소가 1개뿐인 경우 일산화탄소 경고 및 계수 안내
+      sound.playFail();
+      addLog('⚠️ 화학양론 불균형: 이산화탄소(CO₂)를 합성하려면 산소(O)가 2개 필요합니다! (현재 산소 1개는 일산화탄소 불안정 상태)', 'warning');
       return;
     }
 
@@ -673,26 +684,30 @@ export function App() {
         {/* 중앙 워크스페이스 */}
         <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden relative">
           {/* 미션 브리핑 카드 */}
-          <section className="bg-[#15223c]/80 border border-[#203358] border-l-4 border-l-cyan-400 rounded-xl p-3.5 flex items-center gap-4 shadow-lg shrink-0">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-900 border border-white/20 flex items-center justify-center text-2xl shadow-md shrink-0">
+          <section className="bg-[#15223c]/90 border border-[#203358] border-l-4 border-l-cyan-400 rounded-2xl p-4 md:p-5 flex items-center gap-5 shadow-xl shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-900 border border-white/20 flex items-center justify-center text-3xl shadow-lg shrink-0">
               🧑‍🔬
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800 tracking-wide">
                   Stage {currentStage.level}
                 </span>
-                <h2 className="text-sm font-extrabold text-white truncate">{currentStage.name}</h2>
+                <h2 className="text-lg md:text-xl font-black text-white truncate tracking-tight">
+                  {currentStage.name}
+                </h2>
               </div>
-              <p className="text-xs text-slate-300 mt-1 line-clamp-1">{currentStage.desc}</p>
-              <div className="text-[11px] text-amber-400 font-semibold mt-0.5 flex items-center gap-1">
+              <p className="text-sm md:text-base font-medium text-slate-200 mt-1.5 leading-snug">
+                {currentStage.desc}
+              </p>
+              <div className="text-xs md:text-sm text-amber-300 font-bold mt-1.5 flex items-center gap-1.5">
                 <span>{currentStage.constraint}</span>
               </div>
             </div>
-            <div className="flex flex-col items-center pl-4 border-l border-slate-800 shrink-0">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">목표 물질</span>
-              <div className="mt-1">
-                <Bubble name={currentStage.target} scale={0.85} />
+            <div className="flex flex-col items-center pl-5 border-l border-slate-700/80 shrink-0">
+              <span className="text-xs uppercase font-extrabold text-slate-400 tracking-wider">목표 물질</span>
+              <div className="mt-1.5">
+                <Bubble name={currentStage.target} scale={0.95} />
               </div>
             </div>
           </section>
@@ -785,11 +800,11 @@ export function App() {
             </div>
           </section>
 
-          {/* 하단 실험 기록 로그 */}
-          <section className="h-28 bg-[#080d1a] border border-[#203358] rounded-xl p-3 flex flex-col gap-1 overflow-y-auto font-mono text-xs shrink-0">
+          {/* 하단 실험 기록 로그 (간소화) */}
+          <section className="h-16 bg-[#080d1a] border border-[#203358] rounded-xl px-3 py-2 flex flex-col gap-1 overflow-y-auto font-mono text-[11px] shrink-0">
             {logs.map((log, i) => (
-              <div key={i} className="leading-tight flex items-start gap-2">
-                <span className="text-slate-500 text-[10px]">[LOG]</span>
+              <div key={i} className="leading-normal flex items-start gap-2">
+                <span className="text-slate-500 text-[10px] shrink-0">[LOG]</span>
                 <span
                   className={
                     log.type === 'success'
