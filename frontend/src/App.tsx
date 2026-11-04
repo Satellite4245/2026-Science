@@ -545,9 +545,11 @@ export function App() {
           </div>
           <div>
             <div className="text-base font-black tracking-tight bg-gradient-to-r from-slate-100 to-cyan-400 bg-clip-text text-transparent">
-              QUANTUM REACTION LAB
+              Matter doesn't matter
             </div>
-            <div className="text-[11px] text-slate-400">초고에너지 화학 & 양자 파괴 시뮬레이터</div>
+            <div className="text-[11px] text-slate-400">
+              주어진 물질과 원소, 소립자 반응을 이용한 목표 물질 합성 시뮬레이션
+            </div>
           </div>
         </div>
 
