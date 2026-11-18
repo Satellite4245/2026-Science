@@ -5,86 +5,116 @@ import {
   type Stage,
   ELEMENT_STYLES,
 } from './types/elements';
+import { evaluateChamberReaction, type LogType } from './data/reactions';
 import { Bubble } from './components/Bubble';
 import { ParticleColliderModal } from './components/ParticleColliderModal';
 import { CodexModal } from './components/CodexModal';
+import { Header } from './components/Header';
+import { MissionPanel } from './components/MissionPanel';
+import { ResultModal, type ResultModalState } from './components/ResultModal';
 import { sound } from './utils/sound';
 import {
   Flame,
-  Volume2,
-  VolumeX,
-  BookOpen,
-  Atom,
   RotateCcw,
   Send,
   Sparkles,
-  AlertTriangle,
-  Radio,
+  CheckCircle2,
+  AlertCircle,
+  Info,
 } from 'lucide-react';
 
+interface FeedbackState {
+  text: string;
+  type: LogType;
+}
+
+const COMBO_TARGET = 8;
+const COMBO_WINDOW_MS = 8000;
+
 export function App() {
+  const initialStage = STAGES.NORMAL[0];
+
   const [mode, setMode] = useState<'NORMAL' | 'HARDCORE'>('NORMAL');
   const [level, setLevel] = useState<number>(1);
-  const [inventory, setInventory] = useState<string[]>([]);
+  const [inventory, setInventory] = useState<string[]>(() => [...initialStage.items]);
   const [chamber, setChamber] = useState<string[]>([]);
-  const [timeLeft, setTimeLeft] = useState<number>(120);
+  const [timeLeft, setTimeLeft] = useState<number>(initialStage.timeLimit);
+  const [completedStages, setCompletedStages] = useState<Set<string>>(() => new Set());
 
-  // 이펙트 & 게임플레이 상태
   const [combo, setCombo] = useState<number>(0);
-  const [comboText, setComboText] = useState<string | null>(null);
-  const [heat, setHeat] = useState<number>(0); // 0 ~ 100 위험도 게이지
-  const [screenQuake, setScreenQuake] = useState<boolean>(false);
-  const [screenShake, setScreenShake] = useState<boolean>(false);
-  const [flashColor, setFlashColor] = useState<string | null>(null);
-  const [cracked, setCracked] = useState<boolean>(false);
-  const [emergencyBanner, setEmergencyBanner] = useState<string | null>(null);
+  const [heat, setHeat] = useState<number>(0);
+  const [chamberNudge, setChamberNudge] = useState<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => sound.enabled);
 
   // 모달 제어
   const [isSynthOpen, setIsSynthOpen] = useState<boolean>(false);
   const [isCodexOpen, setIsCodexOpen] = useState<boolean>(false);
-  const [resultModal, setResultModal] = useState<{
-    show: boolean;
-    stars: string;
-    tier: string;
-    desc: string;
-  } | null>(null);
+  const [resultModal, setResultModal] = useState<ResultModalState | null>(null);
+  const [resetCount, setResetCount] = useState<number>(0);
 
-  // 로그
-  const [logs, setLogs] = useState<Array<{ text: string; type: 'info' | 'success' | 'danger' | 'warning' }>>([]);
-  const logEndRef = useRef<HTMLDivElement | null>(null);
+  // 인라인 피드백 및 기록 로그
+  const [feedback, setFeedback] = useState<FeedbackState>({
+    text: `연구 과제 시작: [${initialStage.name}] — 목표 물질은 '${initialStage.target}'입니다.`,
+    type: 'info',
+  });
+  const [logs, setLogs] = useState<FeedbackState[]>([
+    {
+      text: `과제 시작: [${initialStage.name}] 목표 물질 '${initialStage.target}'`,
+      type: 'info',
+    },
+  ]);
+
+  const logContainerRef = useRef<HTMLElement | null>(null);
   const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 현재 스테이지
   const currentStageList = STAGES[mode];
-  const currentStage: Stage = currentStageList.find((s) => s.level === level) || currentStageList[0];
+  const currentStage: Stage =
+    currentStageList.find((s) => s.level === level) || currentStageList[0];
+  const isTargetReady = chamber.includes(currentStage.target);
+  const showTargetReadyBanner = isTargetReady && feedback.type !== 'danger';
 
-  // 스테이지 로드
-  const loadStage = (lvl: number, targetMode = mode) => {
-    setLevel(lvl);
-    const s = STAGES[targetMode].find((x) => x.level === lvl) || STAGES[targetMode][0];
-    setInventory([...s.items]);
-    setChamber([]);
-    setTimeLeft(s.timeLimit);
-    setHeat(0);
-    setCombo(0);
-    setCracked(false);
-    setEmergencyBanner(null);
-    addLog(`새로운 연구 과제: [${s.name}] 목표: ${s.target}`, 'info');
+  const pushFeedback = (text: string, type: LogType = 'info') => {
+    setFeedback({ text, type });
+    setLogs((prev) => [...prev.slice(-29), { text, type }]);
   };
 
-  useEffect(() => {
-    loadStage(1, mode);
-  }, [mode]);
+  const resetStage = (lvl: number, targetMode: 'NORMAL' | 'HARDCORE') => {
+    const targetStage =
+      STAGES[targetMode].find((x) => x.level === lvl) || STAGES[targetMode][0];
+    if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+    setMode(targetMode);
+    setLevel(targetStage.level);
+    setInventory([...targetStage.items]);
+    setChamber([]);
+    setTimeLeft(targetStage.timeLimit);
+    setHeat(0);
+    setCombo(0);
+    setIsSynthOpen(false);
+    setIsCodexOpen(false);
+    setResultModal(null);
+    setResetCount((c) => c + 1);
+    pushFeedback(
+      `연구 과제 시작: [${targetStage.name}] — 목표 물질은 '${targetStage.target}'입니다.`,
+      'info',
+    );
+  };
 
-  // 타이머
+  // 1초 카운트다운 타이머 (결과 모달 표시 중에는 일시 정지)
   useEffect(() => {
+    if (resultModal) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
           sound.playFail();
-          alert('⏱️ 제한 시간 초과! 반응물이 분해되어 실험이 실패했습니다.');
-          loadStage(level);
+          setIsSynthOpen(false);
+          setIsCodexOpen(false);
+          setResultModal({
+            kind: 'timeout',
+            stageName: currentStage.name,
+          });
           return 0;
         }
         return prev - 1;
@@ -92,154 +122,63 @@ export function App() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [level, mode]);
+  }, [currentStage.name, resultModal]);
 
-  // 멜트다운 100% 검사
+  // 로그 자동 스크롤 (외부 뷰포트 스크롤 없이 로그 컨테이너 내부만 스크롤)
   useEffect(() => {
-    if (heat >= 100) {
-      triggerTotalMeltdown();
+    const el = logContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
     }
-  }, [heat]);
-
-  // 로그 자동 스크롤
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  const addLog = (text: string, type: 'info' | 'success' | 'danger' | 'warning' = 'info') => {
-    setLogs((prev) => [...prev.slice(-30), { text, type }]);
+  // 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+      if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+    };
+  }, []);
+
+  const triggerChamberNudge = () => {
+    setChamberNudge(false);
+    requestAnimationFrame(() => {
+      setChamberNudge(true);
+    });
+    if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+    nudgeTimerRef.current = setTimeout(() => {
+      setChamberNudge(false);
+    }, 400);
   };
 
-  // 타격감 & 스파크 연출 트리거
-  const triggerImpactEffect = (type: 'normal' | 'fire' | 'hydrogen' | 'void' | 'nuke') => {
-    if (type === 'normal') {
-      setScreenShake(true);
-      setTimeout(() => setScreenShake(false), 300);
-      confetti({
-        particleCount: 25,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ['#38bdf8', '#34d399', '#fde047'],
-      });
-    } else if (type === 'fire') {
-      setScreenShake(true);
-      setFlashColor('rgba(249, 115, 22, 0.4)');
-      setTimeout(() => setFlashColor(null), 300);
-      setTimeout(() => setScreenShake(false), 400);
-      confetti({
-        particleCount: 50,
-        spread: 90,
-        origin: { y: 0.6 },
-        colors: ['#f97316', '#ef4444', '#facc15'],
-      });
-    } else if (type === 'hydrogen') {
-      setScreenShake(true);
-      setFlashColor('rgba(56, 189, 248, 0.5)');
-      setTimeout(() => setFlashColor(null), 350);
-      setTimeout(() => setScreenShake(false), 500);
-      confetti({
-        particleCount: 70,
-        spread: 120,
-        origin: { y: 0.6 },
-        colors: ['#38bdf8', '#0284c7', '#ffffff'],
-      });
-    } else if (type === 'void') {
-      setScreenShake(true);
-      setFlashColor('rgba(168, 85, 247, 0.5)');
-      setTimeout(() => setFlashColor(null), 400);
-      setTimeout(() => setScreenShake(false), 600);
-      confetti({
-        particleCount: 80,
-        spread: 140,
-        origin: { y: 0.6 },
-        colors: ['#a855f7', '#7e22ce', '#3b0764', '#000000'],
-      });
-    } else if (type === 'nuke') {
-      triggerCatastrophicSequence();
-    }
-  };
-
-  // 콤보 증가
-  const bumpCombo = () => {
+  const handleComboAdvance = (
+    nextChamber: string[],
+    nextInventory: string[],
+  ): { chamber: string[]; inventory: string[] } => {
     const nextCombo = combo + 1;
     setCombo(nextCombo);
     sound.playCombo(nextCombo);
 
     if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-
-    const comboMessages = [
-      '',
-      '💥 REACTION HIT!',
-      '🔥 DOUBLE COMBO!',
-      '⚡ TRIPLE BURST!',
-      '🌟 QUADRA FUSION!',
-      '🚀 OVERDRIVE CRITICAL!',
-    ];
-    setComboText(comboMessages[Math.min(nextCombo, 5)] || `⚡ x${nextCombo} CHAIN COMBO!`);
-
-    // 만약 25콤보 목표 스테이지에서 25콤보 달성 시
-    if (nextCombo >= 25 && currentStage.target === '25콤보 마스터') {
-      if (!inventory.includes('25콤보 마스터')) {
-        setInventory((prev) => [...prev, '25콤보 마스터']);
-      }
-      setChamber((prev) => [...prev, '25콤보 마스터']);
-      addLog('👑 [25 COMBO MASTER] 25콤보 돌파! 궁극의 콤보 마스터 원소가 챔버에 강림했습니다!', 'success');
-      confetti({ particleCount: 200, spread: 180, origin: { y: 0.5 } });
-    }
-
     comboTimerRef.current = setTimeout(() => {
       setCombo(0);
-      setComboText(null);
-    }, 6000); // 콤보 여유시간 6초로 상향
-  };
+    }, COMBO_WINDOW_MS);
 
-  // 대폭발 & 방폭 차폐막 파손 시퀀스 (핵폭발 or 멜트다운 100%)
-  const triggerCatastrophicSequence = () => {
-    sound.playExplosion('nuke');
-    setScreenQuake(true);
-    setFlashColor('#ffffff');
-    setCracked(true);
-    setEmergencyBanner('⚠️ DANGER: CORE CONTAINMENT BREACH (연쇄 폭발로 방폭 격벽 파손!) ⚠️');
-
-    confetti({
-      particleCount: 150,
-      spread: 160,
-      origin: { y: 0.5 },
-      colors: ['#ef4444', '#f97316', '#ffffff', '#eab308'],
-    });
-
-    setTimeout(() => {
-      setFlashColor('rgba(239, 68, 68, 0.4)');
-      setTimeout(() => setFlashColor(null), 800);
-    }, 400);
-
-    setTimeout(() => {
-      setScreenQuake(false);
-      setTimeout(() => {
-        setEmergencyBanner(null);
-      }, 5000);
-    }, 3500);
-  };
-
-  // 과열 게이지 100% 멜트다운
-  const triggerTotalMeltdown = () => {
-    triggerCatastrophicSequence();
-    addLog('🚨 [CORE MELTDOWN] 과열 위험도 100% 도달! 챔버 원소들이 격렬히 폭발하며 소실되었습니다!', 'danger');
-    
-    // 만약 레벨 목표가 코어 멜트다운이라면 인벤토리 및 챔버에 코어 멜트다운 생성
-    if (currentStage.target === '코어 멜트다운') {
-      setChamber(['코어 멜트다운']);
-      if (!inventory.includes('코어 멜트다운')) {
-        setInventory((prev) => [...prev, '코어 멜트다운']);
-      }
-      bumpCombo();
-    } else {
-      setChamber([]);
+    if (nextCombo >= COMBO_TARGET && currentStage.target === '8콤보 마스터') {
+      const updatedInventory = nextInventory.includes('8콤보 마스터')
+        ? nextInventory
+        : [...nextInventory, '8콤보 마스터'];
+      const updatedChamber = [...nextChamber, '8콤보 마스터'];
+      pushFeedback(
+        `${COMBO_TARGET}연속 반응 달성: [8콤보 마스터]가 생성되었습니다. 연구 결과를 제출하세요.`,
+        'success',
+      );
+      return { chamber: updatedChamber, inventory: updatedInventory };
     }
-    setHeat(0);
+
+    return { chamber: nextChamber, inventory: nextInventory };
   };
 
-  // 원소 추가/제거
   const handleAddToChamber = (item: string) => {
     sound.playDrop();
     setChamber((prev) => [...prev, item]);
@@ -254,565 +193,393 @@ export function App() {
     if (chamber.length > 0) {
       sound.playClick();
       setChamber([]);
-      addLog('반응 챔버를 비웠습니다.', 'info');
+      pushFeedback('반응 챔버를 비웠습니다.', 'info');
     }
   };
 
-  // 반응 처리 엔진
   const handleTriggerReaction = () => {
-    if (chamber.length === 0) {
+    const result = evaluateChamberReaction(chamber);
+
+    if (result.status === 'empty') {
       sound.playFail();
-      addLog('반응 챔버가 비어 있습니다.', 'warning');
+      pushFeedback(result.message, 'warning');
       return;
     }
 
-    const count = (name: string) => chamber.filter((x) => x === name).length;
-
-    // 1. 제약 조건 검사: 탄소+산소+수소 직접 포도당 금지
-    if (count('탄소') >= 1 && count('산소') >= 1 && count('수소') >= 1) {
+    if (result.status === 'blocked') {
       sound.playFail();
-      addLog('⚠️ 반응 차단: 광합성 경로(CO₂ + H₂O + 빛 에너지)를 거쳐야 포도당을 합성할 수 있습니다!', 'danger');
+      pushFeedback(result.message, result.logType);
       return;
     }
 
-    // 2. 제약 조건: 수산화 이온 단독 분해 금지
-    if (chamber.length === 1 && chamber[0] === '수산화 이온') {
+    if (result.status === 'none') {
       sound.playFail();
-      addLog('⚠️ 반응 실패: 수산화 이온 단독 분해는 불가능합니다.', 'danger');
+      pushFeedback(result.message, 'warning');
       return;
     }
 
-    // 3. 제약 조건: 우라늄 + 전자 충돌 금지
-    if (count('우라늄-235') >= 1 && count('전자') >= 1) {
-      sound.playFail();
-      addLog('⚠️ 반응 차단: 전자를 충돌시켜서는 핵분열을 유도할 수 없습니다! (중성자 충돌 필수)', 'danger');
-      return;
-    }
+    const { rule } = result;
 
-    // ----------------------------------------------------
-    // [폭발 반응 1] 우라늄-235 + 중성자 = 핵분열 대폭발
-    // ----------------------------------------------------
-    if (count('우라늄-235') >= 1 && count('중성자') >= 1) {
-      replaceChamber(['우라늄-235', '중성자'], ['핵분열 성공']);
-      triggerImpactEffect('nuke');
-      setHeat((prev) => Math.min(100, prev + 60));
-      bumpCombo();
-      addLog('💥 임계질량 초과 및 연쇄 핵분열 발생! 연구실 전면 대폭발!', 'danger');
-      return;
-    }
-
-    // ----------------------------------------------------
-    // [폭발 반응 2] 나트륨 + 물 = 알칼리 금속 격렬 폭발
-    // ----------------------------------------------------
-    if (count('나트륨') >= 1 && count('물') >= 1) {
-      replaceChamber(['나트륨', '물'], ['알칼리 폭발재']);
-      sound.playExplosion('medium');
-      triggerImpactEffect('fire');
-      setHeat((prev) => Math.min(100, prev + 35));
-      bumpCombo();
-      addLog('🔥💥 [알칼리 폭발] 나트륨이 물과 격렬히 반응하며 수소 가스를 분출하고 굉음을 내며 폭발했습니다!', 'danger');
-      return;
-    }
-
-    // ----------------------------------------------------
-    // [폭발 반응 3] 수소 2개 + 산소 1개 + 열에너지 = 수소 폭명기 점화 폭발 (2H + O + Heat -> H2O steam)
-    // ----------------------------------------------------
-    if (count('수소') >= 2 && count('산소') >= 1 && count('열에너지') >= 1) {
-      replaceChamber(['수소', '수소', '산소', '열에너지'], ['초고온 수증기']);
-      sound.playExplosion('medium');
-      triggerImpactEffect('hydrogen');
-      setHeat((prev) => Math.min(100, prev + 45));
-      bumpCombo();
-      addLog('⚡💥 [수소 폭명기 폭발] 2H + O + 열에너지 점화로 강력한 충격파를 일으켰습니다!', 'danger');
-      return;
-    } else if (count('수소') >= 1 && count('산소') >= 1 && count('열에너지') >= 1) {
-      // 수소가 1개뿐일 때 친절한 화학양론 안내
-      sound.playFail();
-      addLog('⚠️ 화학양론 불균형: 수소 폭명기 반응(2H + O)을 일으키려면 수소(H)가 2개 필요합니다!', 'warning');
-      return;
-    }
-
-    // ----------------------------------------------------
-    // [폭발 반응 4] 양성자 + 전자 + 열에너지 = 반물질 과밀도 붕괴
-    // ----------------------------------------------------
-    if (count('양성자') >= 1 && count('전자') >= 1 && count('열에너지') >= 1) {
-      replaceChamber(['양성자', '전자', '열에너지'], ['반물질 잔해']);
-      sound.playExplosion('medium');
-      triggerImpactEffect('void');
-      setHeat((prev) => Math.min(100, prev + 50));
-      bumpCombo();
-      addLog('🌀💥 [반물질 왜곡 붕괴] 고에너지 입자 쌍소멸로 인해 공간 왜곡 글리치 폭발이 일어났습니다!', 'danger');
-      return;
-    }
-
-    // ----------------------------------------------------
-    // [일반 화학 반응 1] 나트륨 + 염소 -> 염화나트륨
-    // ----------------------------------------------------
-    if (count('나트륨') >= 1 && count('염소') >= 1) {
-      replaceChamber(['나트륨', '염소'], ['염화나트륨']);
-      triggerImpactEffect('normal');
-      setHeat((prev) => Math.min(100, prev + 10));
-      bumpCombo();
-      addLog('✨ [이온결합] Na + Cl → NaCl 소금 결정 합성 완료!', 'success');
-      return;
-    }
-
-    // [일반 화학 반응 2] 염화나트륨 + 물 -> 염화나트륨 수용액
-    if (count('염화나트륨') >= 1 && count('물') >= 1) {
-      replaceChamber(['염화나트륨', '물'], ['염화나트륨 수용액']);
-      triggerImpactEffect('normal');
-      setHeat((prev) => Math.max(0, prev - 10)); // 흡열/안정화
-      bumpCombo();
-      addLog('🌊 [용해] NaCl이 물에 녹아 염화나트륨 수용액이 되었습니다.', 'success');
-      return;
-    }
-
-    // [일반 화학 반응 3] 수소 이온 + 염소 -> 염산
-    if (count('수소 이온') >= 1 && count('염소') >= 1) {
-      replaceChamber(['수소 이온', '염소'], ['염산']);
-      triggerImpactEffect('normal');
-      setHeat((prev) => Math.min(100, prev + 15));
-      bumpCombo();
-      addLog('🧪 [산 합성] H⁺ + Cl → HCl 염산 합성!', 'success');
-      return;
-    }
-
-    // [일반 화학 반응 4] 나트륨 + 수산화 이온 -> 수산화나트륨
-    if (count('나트륨') >= 1 && count('수산화 이온') >= 1) {
-      replaceChamber(['나트륨', '수산화 이온'], ['수산화나트륨']);
-      triggerImpactEffect('normal');
-      setHeat((prev) => Math.min(100, prev + 15));
-      bumpCombo();
-      addLog('🧪 [염기 합성] Na + OH⁻ → NaOH 수산화나트륨 합성!', 'success');
-      return;
-    }
-
-    // [일반 화학 반응 5] 염산 + 수산화나트륨 -> 물 + 염화나트륨 (중화반응)
-    if (count('염산') >= 1 && count('수산화나트륨') >= 1) {
-      replaceChamber(['염산', '수산화나트륨'], ['물', '염화나트륨']);
-      triggerImpactEffect('normal');
-      setHeat((prev) => Math.min(100, prev + 20)); // 중화열
-      bumpCombo();
-      addLog('⚖️ [중화반응] HCl + NaOH → H₂O + NaCl 중화 발열반응 성공!', 'success');
-      return;
-    }
-
-    // [일반 화학 반응 6] 수소 + 산소 -> 수산화 이온 (1:1)
-    if (count('수소') === 1 && count('산소') === 1 && chamber.length === 2) {
-      replaceChamber(['수소', '산소'], ['수산화 이온']);
-      triggerImpactEffect('normal');
-      bumpCombo();
-      addLog('✨ 수소(H) 1개와 산소(O) 1개가 결합하여 수산화 이온(OH⁻)을 형성하였습니다.', 'success');
-      return;
-    }
-
-    // [일반 화학 반응 7] 수소 2개 + 산소 1개 -> 물 (2H + O -> H2O 화학 반응식 계수 엄격 준수)
-    if (count('수소') >= 2 && count('산소') >= 1) {
-      replaceChamber(['수소', '수소', '산소'], ['물']);
-      triggerImpactEffect('normal');
-      bumpCombo();
-      addLog('💧 [공유결합] 2H + O → H₂O 수소 2개와 산소 1개가 반응하여 물 분자가 합성되었습니다.', 'success');
-      return;
-    } else if (count('수소') === 1 && count('산소') >= 1 && chamber.length >= 2 && !chamber.includes('열에너지')) {
-      // 수소가 1개 부족한 경우 화학양론 안내
-      sound.playFail();
-      addLog('⚠️ 화학양론 불균형: 물(H₂O)을 합성하려면 수소(H)가 2개 필요합니다! (현재 수소 1개)', 'warning');
-      return;
-    }
-
-    // [일반 화학 반응 8] 탄소 1개 + 산소 2개 -> 이산화탄소 (C + 2O -> CO2 화학 반응식 계수 엄격 준수)
-    if (count('탄소') >= 1 && count('산소') >= 2) {
-      replaceChamber(['탄소', '산소', '산소'], ['이산화탄소']);
-      triggerImpactEffect('normal');
-      bumpCombo();
-      addLog('💨 [산화반응] C + 2O → CO₂ 탄소 1개와 산소 2개가 반응하여 이산화탄소가 생성되었습니다!', 'success');
-      return;
-    } else if (count('탄소') >= 1 && count('산소') === 1 && !chamber.includes('열에너지')) {
-      // 산소가 1개뿐인 경우 일산화탄소 경고 및 계수 안내
-      sound.playFail();
-      addLog('⚠️ 화학양론 불균형: 이산화탄소(CO₂)를 합성하려면 산소(O)가 2개 필요합니다! (현재 산소 1개는 일산화탄소 불안정 상태)', 'warning');
-      return;
-    }
-
-    // [일반 화학 반응 9] 탄소 + 열에너지 -> 빛 에너지
-    if (count('탄소') >= 1 && count('열에너지') >= 1) {
-      replaceChamber(['탄소', '열에너지'], ['빛 에너지']);
-      triggerImpactEffect('normal');
-      bumpCombo();
-      addLog('☀️ [에너지 전환] 연소를 통해 강렬한 빛 에너지(Photon) 방출!', 'success');
-      return;
-    }
-
-    // [일반 화학 반응 10] 광합성
-    if (count('이산화탄소') >= 1 && count('물') >= 1 && count('빛 에너지') >= 1) {
-      replaceChamber(['이산화탄소', '물', '빛 에너지'], ['포도당']);
-      triggerImpactEffect('normal');
-      bumpCombo();
-      addLog('🌿 [광합성] CO₂ + H₂O + 빛 에너지 → 포도당(C₆H₁₂O₆) 합성 대성공!', 'success');
-      return;
-    }
-
-    // 무반응
-    sound.playFail();
-    addLog('❌ 유효한 반응물이 조합되지 않았습니다. 도감을 확인하세요.', 'warning');
-  };
-
-  const replaceChamber = (consumed: string[], produced: string[]) => {
+    // 소비 및 생성 물질 반영
     const nextChamber = [...chamber];
-    consumed.forEach((name) => {
+    rule.consumed.forEach((name) => {
       const idx = nextChamber.indexOf(name);
       if (idx !== -1) nextChamber.splice(idx, 1);
     });
-    produced.forEach((p) => {
+
+    const nextInventory = [...inventory];
+    rule.produced.forEach((p) => {
       nextChamber.push(p);
-      if (!inventory.includes(p)) {
-        setInventory((prev) => [...prev, p]);
+      if (!nextInventory.includes(p)) {
+        nextInventory.push(p);
       }
     });
-    setChamber(nextChamber);
-  };
 
-  // 연구 제출
-  const handleSubmit = () => {
-    if (chamber.includes(currentStage.target)) {
-      sound.playSuccess();
-      const ratio = timeLeft / currentStage.timeLimit;
-      let stars = '★☆☆';
-      let tier = '수습 연구원 등급';
-      if (ratio >= 0.6) {
-        stars = '★★★';
-        tier = '수석 연구원 (Master Scientist)';
-      } else if (ratio >= 0.3) {
-        stars = '★★☆';
-        tier = '선임 연구원 (Senior Scientist)';
+    // 사운드 및 절제된 챔버 피드백
+    if (rule.impactType !== 'normal') {
+      sound.playExplosion(rule.impactType === 'nuke' ? 'nuke' : 'medium');
+      triggerChamberNudge();
+    }
+
+    // 과열도 계산 및 100% 멜트다운 처리
+    const nextHeat = Math.max(0, Math.min(100, heat + rule.heatDelta));
+
+    if (nextHeat >= 100) {
+      sound.playExplosion('nuke');
+      triggerChamberNudge();
+      setHeat(0);
+
+      if (currentStage.target === '코어 멜트다운') {
+        const meltdownInv = nextInventory.includes('코어 멜트다운')
+          ? nextInventory
+          : [...nextInventory, '코어 멜트다운'];
+        const meltdownChamber = ['코어 멜트다운'];
+        setInventory(meltdownInv);
+        setChamber(meltdownChamber);
+        handleComboAdvance(meltdownChamber, meltdownInv);
+        pushFeedback(
+          '과열도 100% 도달: [코어 멜트다운]이 생성되었습니다. 연구 결과를 제출하세요.',
+          'success',
+        );
+      } else {
+        setInventory(nextInventory);
+        setChamber([]);
+        pushFeedback(
+          '과열도 100% 도달: 챔버 과열로 내부 물질이 초기화되었습니다. 다시 투입해 주세요.',
+          'danger',
+        );
       }
-
-      confetti({ particleCount: 100, spread: 100, origin: { y: 0.5 } });
-
-      setResultModal({
-        show: true,
-        stars,
-        tier,
-        desc: `[${currentStage.target}] 제출 검증 완료! 잔여 시간: ${timeLeft}초`,
-      });
-    } else {
-      sound.playFail();
-      addLog(`⚠️ 제출 실패: 챔버에 '${currentStage.target}'이 없습니다!`, 'danger');
+      return;
     }
+
+    setHeat(nextHeat);
+    pushFeedback(rule.logMessage, rule.category === 'hazard' ? 'warning' : 'success');
+
+    const afterCombo = handleComboAdvance(nextChamber, nextInventory);
+    setChamber(afterCombo.chamber);
+    setInventory(afterCombo.inventory);
   };
 
-  const handleNextStage = () => {
-    setResultModal(null);
-    if (level < currentStageList.length) {
-      loadStage(level + 1);
-    } else {
-      alert('🎉 모든 과제를 완수하셨습니다! 첫 번째 과제로 돌아갑니다.');
-      loadStage(1);
+  const handleSubmit = () => {
+    if (!chamber.includes(currentStage.target)) {
+      sound.playFail();
+      pushFeedback(
+        `제출 불가: 챔버 안에 목표 물질 '${currentStage.target}'이 아직 없습니다.`,
+        'danger',
+      );
+      return;
     }
+
+    sound.playSuccess();
+    setCompletedStages((prev) => {
+      const next = new Set(prev);
+      next.add(`${mode}-${level}`);
+      return next;
+    });
+
+    const ratio = timeLeft / currentStage.timeLimit;
+    let stars = '★☆☆';
+    let tier = '수습 연구원 등급';
+    if (ratio >= 0.6) {
+      stars = '★★★';
+      tier = '수석 연구원 등급';
+    } else if (ratio >= 0.3) {
+      stars = '★★☆';
+      tier = '선임 연구원 등급';
+    }
+
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!prefersReducedMotion) {
+      void confetti({ particleCount: 55, spread: 75, origin: { y: 0.6 } });
+    }
+
+    const isLastStage = level >= currentStageList.length;
+    setResultModal({
+      kind: isLastStage ? 'course_complete' : 'stage_clear',
+      mode,
+      target: currentStage.target,
+      timeLeft,
+      stars,
+      tier,
+    });
+  };
+
+  const handleToggleSound = () => {
+    const next = !soundEnabled;
+    sound.enabled = next;
+    setSoundEnabled(next);
   };
 
   return (
-    <div
-      className={`h-screen w-screen flex flex-col bg-[#070b13] text-slate-100 overflow-hidden font-sans relative ${
-        screenQuake ? 'quake-active' : ''
-      } ${screenShake ? 'shake-active' : ''}`}
-    >
-      {/* 화면 번쩍임 플래시 오버레이 */}
-      {flashColor && (
-        <div
-          className="fixed inset-0 pointer-events-none z-50 transition-opacity"
-          style={{ backgroundColor: flashColor }}
-        />
-      )}
+    <div className="min-h-screen lg:h-screen w-full flex flex-col bg-[#0b111e] text-slate-100 lg:overflow-hidden">
+      <Header
+        mode={mode}
+        level={level}
+        stages={currentStageList}
+        completedStages={completedStages}
+        timeLeft={timeLeft}
+        soundEnabled={soundEnabled}
+        onModeChange={(nextMode) => resetStage(1, nextMode)}
+        onSelectStage={(lvl) => resetStage(lvl, mode)}
+        onOpenSynth={() => setIsSynthOpen(true)}
+        onOpenCodex={() => setIsCodexOpen(true)}
+        onToggleSound={handleToggleSound}
+      />
 
-      {/* 방폭 유리 균열 오버레이 */}
-      {cracked && <div className="screen-cracks" />}
-
-      {/* 비상 경보 배너 */}
-      {emergencyBanner && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white font-mono font-black text-sm px-6 py-2.5 rounded-xl border-2 border-red-200 shadow-[0_0_40px_rgba(239,68,68,0.9)] animate-pulse flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5" />
-          <span>{emergencyBanner}</span>
-        </div>
-      )}
-
-      {/* 콤보 팝업 플로팅 연출 */}
-      {comboText && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-40 pointer-events-none flex flex-col items-center animate-bounce">
-          <div className="text-3xl md:text-5xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-red-500 drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]">
-            {comboText}
-          </div>
-          <div className="text-xs font-mono font-bold text-amber-300 tracking-widest mt-1">
-            HEAT & POWER RUSHING!
-          </div>
-        </div>
-      )}
-
-      {/* 상단 네비게이션 헤더 */}
-      <header className="relative z-10 bg-[#0d1527]/90 backdrop-blur-md border-b border-[#203358] px-6 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-900 flex items-center justify-center text-xl shadow-[0_0_16px_rgba(56,189,248,0.4)] border border-white/30">
-            ⚛️
-          </div>
-          <div>
-            <div className="text-base font-black tracking-tight bg-gradient-to-r from-slate-100 to-cyan-400 bg-clip-text text-transparent">
-              Matter doesn't matter
-            </div>
-            <div className="text-[11px] text-slate-400">
-              주어진 물질과 원소, 소립자 반응을 이용한 목표 물질 합성 시뮬레이션
-            </div>
-          </div>
-        </div>
-
-        {/* 모드 탭 */}
-        <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800">
-          <button
-            onClick={() => setMode('NORMAL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              mode === 'NORMAL'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            🧪 일반 화학
-          </button>
-          <button
-            onClick={() => setMode('HARDCORE')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              mode === 'HARDCORE'
-                ? 'bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-md shadow-rose-500/40'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            🔥 하드코어 소립자
-          </button>
-        </div>
-
-        {/* 스테이지 탭 */}
-        <div className="flex items-center gap-1.5">
-          {currentStageList.map((s) => (
-            <button
-              key={s.level}
-              onClick={() => loadStage(s.level)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                s.level === level
-                  ? 'bg-slate-700 text-cyan-300 border-cyan-500 shadow-sm'
-                  : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:text-white'
-              }`}
-            >
-              L{s.level} ★
-            </button>
-          ))}
-        </div>
-
-        {/* 유틸리티 버튼 */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsSynthOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-xs font-bold text-white hover:brightness-110 shadow-md shadow-purple-900/40"
-          >
-            <Atom className="w-4 h-4" />
-            원소 합성기
-          </button>
-
-          <div
-            className={`flex flex-col items-center px-3 py-1 rounded-lg border font-mono ${
-              timeLeft <= 30
-                ? 'bg-rose-950/60 border-rose-500 text-rose-300 animate-pulse'
-                : 'bg-slate-900 border-slate-700 text-slate-200'
-            }`}
-          >
-            <span className="text-[9px] uppercase tracking-wider text-slate-400">Time</span>
-            <span className="text-sm font-bold">
-              {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
-            </span>
-          </div>
-
-          <button
-            onClick={() => {
-              sound.enabled = !sound.enabled;
-              // 강제 리렌더
-              setMode((m) => m);
-            }}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-          >
-            {sound.enabled ? <Volume2 className="w-4 h-4 text-cyan-400" /> : <VolumeX className="w-4 h-4 text-rose-400" />}
-          </button>
-
-          <button
-            onClick={() => setIsCodexOpen(true)}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700"
-          >
-            <BookOpen className="w-4 h-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* 메인 레이아웃 */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 좌측 보관함 패널 */}
-        <aside className="w-72 bg-[#0d1527]/70 border-r border-[#203358] flex flex-col p-4 gap-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
+        {/* 좌측 보유 물질 패널 */}
+        <aside
+          aria-label="보유 물질 목록"
+          className="w-full md:w-60 lg:w-72 bg-[#111827] border-b md:border-b-0 md:border-r border-slate-800 flex flex-col p-3.5 gap-2.5 shrink-0 max-h-56 md:max-h-none min-h-0"
+        >
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
             <div>
-              <div className="text-xs font-extrabold text-white">🎒 실험 보유 품목</div>
-              <div className="text-[11px] text-slate-400">클릭하여 반응 챔버로 투입</div>
+              <h2 className="text-xs font-bold text-slate-100">보유 물질</h2>
+              <p className="text-[11px] text-slate-400">
+                클릭해 투입 (여러 개 필요 시 반복 클릭)
+              </p>
             </div>
-            <span className="text-xs font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono tabular-nums bg-[#182234] text-slate-300 border border-slate-700/70 px-2 py-0.5 rounded">
               {inventory.length}
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1">
-            {inventory.map((item, idx) => (
-              <div
-                key={`${item}-${idx}`}
-                onClick={() => handleAddToChamber(item)}
-                className="bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/60 p-2.5 rounded-xl flex items-center gap-3 cursor-pointer transition-all hover:translate-x-1"
-              >
-                <Bubble name={item} scale={0.72} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-extrabold text-white truncate">{item}</div>
-                  <div className="text-[10px] text-slate-400 font-mono">
-                    {ELEMENT_STYLES[item]?.sub || '물질'}
+          <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-1 content-start auto-rows-max gap-2 pr-0.5">
+            {inventory.map((item) => {
+              const style = ELEMENT_STYLES[item];
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => handleAddToChamber(item)}
+                  className="bg-[#182234] hover:bg-slate-800 border border-slate-700/70 hover:border-sky-400/60 p-2 rounded-xl flex items-center gap-2.5 text-left transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-400"
+                >
+                  <Bubble name={item} scale={0.62} decorative />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-100 truncate">{item}</div>
+                    <div className="text-[11px] text-slate-400 font-mono truncate">
+                      {style ? `${style.symbol} · ${style.sub}` : '물질'}
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </aside>
 
         {/* 중앙 워크스페이스 */}
-        <main className="flex-1 flex flex-col p-4 gap-4 overflow-hidden relative">
-          {/* 미션 브리핑 카드 */}
-          <section className="bg-[#15223c]/90 border border-[#203358] border-l-4 border-l-cyan-400 rounded-2xl p-4 md:p-5 flex items-center gap-5 shadow-xl shrink-0">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-900 border border-white/20 flex items-center justify-center text-3xl shadow-lg shrink-0">
-              🧑‍🔬
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xs font-black px-2.5 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800 tracking-wide">
-                  Stage {currentStage.level}
-                </span>
-                <h2 className="text-lg md:text-xl font-black text-white truncate tracking-tight">
-                  {currentStage.name}
-                </h2>
-              </div>
-              <p className="text-sm md:text-base font-medium text-slate-200 mt-1.5 leading-snug">
-                {currentStage.desc}
-              </p>
-              <div className="text-xs md:text-sm text-amber-300 font-bold mt-1.5 flex items-center gap-1.5">
-                <span>{currentStage.constraint}</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-center pl-5 border-l border-slate-700/80 shrink-0">
-              <span className="text-xs uppercase font-extrabold text-slate-400 tracking-wider">목표 물질</span>
-              <div className="mt-1.5">
-                <Bubble name={currentStage.target} scale={0.95} />
-              </div>
-            </div>
-          </section>
+        <main className="flex-1 flex flex-col p-3.5 lg:p-4 gap-3 min-h-0 overflow-hidden">
+          <MissionPanel
+            mode={mode}
+            stage={currentStage}
+            inventory={inventory}
+            chamber={chamber}
+            isTargetReady={isTargetReady}
+          />
 
           {/* 반응 챔버 */}
-          <section className="flex-1 bg-gradient-to-b from-[#0f1a30]/90 to-[#080e1b]/95 border-2 border-dashed border-cyan-500/30 rounded-2xl p-4 flex flex-col items-center justify-between relative overflow-hidden shadow-[inset_0_0_50px_rgba(0,0,0,0.7)]">
-            {/* 챔버 상단: 위험도 / 멜트다운 게이지 시스템 */}
-            <div className="w-full flex items-center justify-between px-4 z-10">
-              <div className="flex items-center gap-2">
-                <Radio className={`w-4 h-4 ${heat >= 75 ? 'text-rose-500 animate-spin' : 'text-cyan-400'}`} />
-                <span className="text-xs font-mono font-bold tracking-wider text-slate-300">
-                  CORE STABILITY
+          <section
+            aria-label="반응 챔버"
+            className={`flex-1 min-h-[260px] bg-[#111827] border border-slate-800 rounded-xl p-3.5 lg:p-4 flex flex-col justify-between gap-3 overflow-hidden ${
+              chamberNudge ? 'chamber-nudge' : ''
+            }`}
+          >
+            {/* 챔버 상단: 과열도 게이지 & 연속 반응 콤보 */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/80 shrink-0">
+              <div className="flex items-center gap-2.5 flex-1 min-w-[220px]">
+                <span className="text-xs font-semibold text-slate-300 shrink-0">
+                  과열도 (HEAT)
                 </span>
-              </div>
-
-              {/* 과열 게이지 바 */}
-              <div className="flex items-center gap-3 w-64 md:w-96">
-                <div className="flex-1 h-3 bg-slate-900 rounded-full border border-slate-700 overflow-hidden relative">
+                <div
+                  role="progressbar"
+                  aria-label="챔버 과열도"
+                  aria-valuenow={heat}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="flex-1 max-w-xs h-2.5 bg-[#0b111e] rounded-full border border-slate-800 overflow-hidden"
+                >
                   <div
                     className={`h-full transition-all duration-300 ${
                       heat >= 80
-                        ? 'bg-gradient-to-r from-orange-500 to-red-600 animate-pulse'
-                        : heat >= 40
-                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500'
-                        : 'bg-gradient-to-r from-cyan-400 to-emerald-400'
+                        ? 'bg-rose-500'
+                        : heat >= 45
+                        ? 'bg-amber-400'
+                        : 'bg-sky-400'
                     }`}
                     style={{ width: `${heat}%` }}
                   />
                 </div>
                 <span
-                  className={`text-xs font-mono font-black ${
-                    heat >= 80 ? 'text-red-400 animate-pulse' : 'text-slate-300'
+                  className={`text-xs font-mono font-bold tabular-nums shrink-0 ${
+                    heat >= 80 ? 'text-rose-400' : 'text-slate-300'
                   }`}
                 >
                   {heat}%
                 </span>
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  {currentStage.target === '코어 멜트다운'
+                    ? '(100% 도달 목표)'
+                    : '(100% 시 초기화)'}
+                </span>
               </div>
 
-              {/* 콤보 배율 표시 */}
-              <div className="flex items-center gap-1 font-mono text-xs font-bold text-amber-400">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>COMBO x{combo}</span>
+              <div className="flex items-center gap-1.5 text-xs font-mono tabular-nums px-2.5 py-1 rounded-md bg-[#182234] border border-slate-700/70 text-slate-200">
+                <Sparkles className="w-3.5 h-3.5 text-sky-400" aria-hidden="true" />
+                <span>
+                  연속 반응{' '}
+                  {currentStage.target === '8콤보 마스터'
+                    ? `${Math.min(combo, COMBO_TARGET)}/${COMBO_TARGET}`
+                    : `${combo}회`}
+                </span>
               </div>
             </div>
 
-            {/* 원소들이 배치되는 필드 */}
-            <div className="w-full flex-1 flex items-center justify-center flex-wrap gap-4 p-6 z-10 overflow-y-auto">
+            {/* 버블 배치 영역 */}
+            <div className="flex-1 min-h-0 flex flex-col items-center overflow-y-auto py-2">
               {chamber.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-slate-500 gap-2 pointer-events-none">
-                  <Flame className="w-8 h-8 opacity-40 animate-pulse" />
-                  <span className="text-xs">좌측 보관함에서 원소를 클릭하여 챔버로 투입하세요</span>
+                <div className="flex flex-col items-center justify-center text-center text-slate-400 gap-2 px-4 my-auto">
+                  <Flame className="w-7 h-7 text-slate-500" aria-hidden="true" />
+                  <p className="text-xs sm:text-sm">
+                    왼쪽 보관함에서 물질을 클릭해 투입하세요. 같은 물질을 여러 번 누를 수 있습니다.
+                  </p>
                 </div>
               ) : (
-                chamber.map((item, idx) => (
-                  <Bubble
-                    key={`${item}-${idx}`}
-                    name={item}
-                    scale={1}
-                    onRemove={() => handleRemoveFromChamber(idx)}
-                  />
-                ))
+                <div className="flex flex-col items-center gap-3 w-full my-auto">
+                  <div className="flex items-center justify-center flex-wrap gap-3.5 px-2">
+                    {chamber.map((item, idx) => (
+                      <Bubble
+                        key={`${item}-${idx}`}
+                        name={item}
+                        scale={0.95}
+                        onClick={() => handleRemoveFromChamber(idx)}
+                        onRemove={() => handleRemoveFromChamber(idx)}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    버블을 클릭하거나 우상단 × 버튼으로 회수할 수 있습니다.
+                  </span>
+                </div>
               )}
             </div>
 
-            {/* 챔버 제어 버튼군 */}
-            <div className="flex items-center gap-3 z-10 bg-[#0d1527]/90 px-4 py-2 rounded-xl border border-[#203358] shadow-xl">
-              <button
-                onClick={handleTriggerReaction}
-                className="px-5 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/40 flex items-center gap-1.5 active:scale-95 transition-all"
+            {/* 인라인 반응 결과 피드백 배너 */}
+            <div className="flex flex-col gap-2.5 shrink-0">
+              <div
+                role="status"
+                aria-live="polite"
+                className={`px-3 py-2 rounded-lg border text-xs flex items-center gap-2 ${
+                  showTargetReadyBanner
+                    ? 'bg-emerald-950/50 border-emerald-700/70 text-emerald-200'
+                    : feedback.type === 'success'
+                    ? 'bg-emerald-950/40 border-emerald-800/70 text-emerald-200'
+                    : feedback.type === 'danger'
+                    ? 'bg-rose-950/50 border-rose-800/70 text-rose-200'
+                    : feedback.type === 'warning'
+                    ? 'bg-amber-950/40 border-amber-800/70 text-amber-200'
+                    : 'bg-[#182234] border-slate-700/70 text-slate-300'
+                }`}
               >
-                <Sparkles className="w-4 h-4 fill-slate-950" />
-                ⚡ 반응 실행
-              </button>
+                {showTargetReadyBanner || feedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" aria-hidden="true" />
+                ) : feedback.type === 'danger' ? (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" aria-hidden="true" />
+                ) : feedback.type === 'warning' ? (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" aria-hidden="true" />
+                ) : (
+                  <Info className="w-4 h-4 shrink-0 text-sky-400" aria-hidden="true" />
+                )}
+                <span className="leading-snug">
+                  {showTargetReadyBanner
+                    ? `목표 물질 [${currentStage.target}]이 챔버에 준비되었습니다. '연구 결과 제출'을 눌러 완료하세요.`
+                    : feedback.text}
+                </span>
+              </div>
 
-              <button
-                onClick={handleSubmit}
-                className="px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/40 flex items-center gap-1.5 active:scale-95 transition-all"
-              >
-                <Send className="w-4 h-4" />
-                📤 연구원 제출
-              </button>
+              {/* 챔버 제어 버튼군 */}
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleTriggerReaction}
+                  className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" aria-hidden="true" />
+                  반응 실행
+                </button>
 
-              <button
-                onClick={handleClearChamber}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 flex items-center gap-1.5 active:scale-95 transition-all"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                비우기
-              </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                    isTargetReady
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-emerald-400'
+                      : 'bg-[#182234] hover:bg-slate-700/80 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" aria-hidden="true" />
+                  {isTargetReady ? '목표 준비 완료 — 연구 결과 제출' : '연구 결과 제출'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearChamber}
+                  disabled={chamber.length === 0}
+                  className="px-3.5 py-2 rounded-lg bg-[#182234] hover:bg-slate-700/80 disabled:opacity-45 disabled:cursor-not-allowed text-slate-300 font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                  비우기
+                </button>
+              </div>
             </div>
           </section>
 
-          {/* 하단 실험 기록 로그 (간소화) */}
-          <section className="h-16 bg-[#080d1a] border border-[#203358] rounded-xl px-3 py-2 flex flex-col gap-1 overflow-y-auto font-mono text-[11px] shrink-0">
+          {/* 하단 실험 기록 로그 */}
+          <section
+            ref={logContainerRef}
+            aria-label="실험 기록"
+            className="h-20 bg-[#0d1422] border border-slate-800 rounded-xl px-3 py-2 flex flex-col gap-1 overflow-y-auto font-mono text-[11px] shrink-0"
+          >
             {logs.map((log, i) => (
               <div key={i} className="leading-normal flex items-start gap-2">
-                <span className="text-slate-500 text-[10px] shrink-0">[LOG]</span>
+                <span className="text-slate-400 shrink-0">
+                  {log.type === 'success'
+                    ? '[완료]'
+                    : log.type === 'danger'
+                    ? '[차단]'
+                    : log.type === 'warning'
+                    ? '[주의]'
+                    : '[안내]'}
+                </span>
                 <span
                   className={
                     log.type === 'success'
-                      ? 'text-emerald-400 font-semibold'
+                      ? 'text-emerald-300'
                       : log.type === 'danger'
-                      ? 'text-rose-400 font-bold'
+                      ? 'text-rose-300'
                       : log.type === 'warning'
-                      ? 'text-amber-400'
+                      ? 'text-amber-300'
                       : 'text-slate-300'
                   }
                 >
@@ -820,48 +587,34 @@ export function App() {
                 </span>
               </div>
             ))}
-            <div ref={logEndRef} />
           </section>
         </main>
       </div>
 
-      {/* 모달 컴포넌트들 */}
+      {/* 모달 컴포넌트 */}
       <ParticleColliderModal
+        key={`${mode}-${level}-${resetCount}`}
         isOpen={isSynthOpen}
         onClose={() => setIsSynthOpen(false)}
         onSynthesized={(elem) => {
           if (!inventory.includes(elem)) {
             setInventory((prev) => [...prev, elem]);
           }
-          addLog(`원소 합성기: [${elem}] 획득 완료!`, 'success');
+          pushFeedback(`원소 합성기: [${elem}]을(를) 합성해 보유 물질에 추가했습니다.`, 'success');
         }}
       />
 
       <CodexModal isOpen={isCodexOpen} onClose={() => setIsCodexOpen(false)} />
 
-      {/* 결과 모달 */}
-      {resultModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-[#0f172a] border border-[#203358] rounded-2xl w-full max-w-md p-6 flex flex-col items-center text-center gap-4 shadow-2xl">
-            <div className="text-5xl">🎉</div>
-            <h2 className="text-xl font-black text-white">연구 과제 성공!</h2>
-            <div className="text-4xl tracking-widest text-amber-400 font-black drop-shadow-[0_0_15px_rgba(245,158,11,0.6)]">
-              {resultModal.stars}
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl w-full text-xs text-slate-300 leading-relaxed">
-              {resultModal.desc}
-              <div className="mt-2 text-cyan-400 font-bold">{resultModal.tier}</div>
-            </div>
-            <button
-              onClick={handleNextStage}
-              className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black rounded-xl shadow-lg shadow-cyan-500/40 transition-all active:scale-95"
-            >
-              다음 연구 과제로 진행 ➔
-            </button>
-          </div>
-        </div>
-      )}
+      <ResultModal
+        result={resultModal}
+        onRetryStage={() => resetStage(level, mode)}
+        onNextStage={() => resetStage(level + 1, mode)}
+        onRestartCourse={() => resetStage(1, mode)}
+        onSwitchToHardcore={() => resetStage(1, 'HARDCORE')}
+      />
     </div>
   );
 }
+
 export default App;

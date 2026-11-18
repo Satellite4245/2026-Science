@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { ELEMENT_STYLES } from '../types/elements';
 
 interface BubbleProps {
@@ -6,6 +7,7 @@ interface BubbleProps {
   scale?: number;
   onClick?: () => void;
   onRemove?: () => void;
+  decorative?: boolean;
   className?: string;
 }
 
@@ -14,91 +16,99 @@ export const Bubble: React.FC<BubbleProps> = ({
   scale = 1,
   onClick,
   onRemove,
+  decorative = false,
   className = '',
 }) => {
   const style = ELEMENT_STYLES[name] || {
     symbol: name.substring(0, 3),
     sub: '',
     size: 60,
-    bg: 'radial-gradient(circle at 35% 35%, #94a3b8 0%, #475569 60%, #1e293b 100%)',
+    bg: 'radial-gradient(circle at 35% 35%, #475569 0%, #334155 70%, #1e293b 100%)',
     border: '#94a3b8',
-    textColor: '#fff',
+    textColor: '#f8fafc',
   };
 
   const size = Math.round(style.size * scale);
   const symLen = (style.symbol || '').length;
-  let symRatio = 0.32;
+  let symRatio = 0.31;
   if (symLen >= 7) symRatio = 0.155;
   else if (symLen >= 5) symRatio = 0.185;
-  else if (symLen >= 3) symRatio = 0.23;
+  else if (symLen >= 3) symRatio = 0.22;
 
   const symbolFontSize = Math.max(10, Math.round(size * symRatio));
+  const isInteractive = Boolean(onClick);
 
-  return (
-    <div className={`relative inline-flex items-center justify-center select-none group ${className}`}>
-      <div
-        onClick={onClick}
-        title={name}
-        className="rounded-full relative flex flex-col items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 shadow-lg overflow-hidden shrink-0"
+  const tokenVisual = (
+    <span
+      className={`rounded-full relative flex flex-col items-center justify-center shrink-0 overflow-hidden transition-transform duration-150 ${
+        isInteractive ? 'hover:scale-[1.04] active:scale-95' : ''
+      }`}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        background: style.bg,
+        border: `1.5px solid ${style.border}`,
+        boxShadow: '0 4px 12px rgba(2, 6, 23, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.22)',
+      }}
+    >
+      <span
+        className="font-bold leading-none z-10 text-center tracking-tight px-1 max-w-[92%] truncate"
         style={{
-          width: `${size}px`,
-          height: `${size}px`,
-          background: style.bg,
-          border: `2.5px solid ${style.border}`,
-          boxShadow: '0 8px 20px -4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.7), inset 0 -4px 8px rgba(0,0,0,0.3)',
+          fontSize: `${symbolFontSize}px`,
+          color: style.textColor,
         }}
       >
-        {/* 유리 광택 하이라이트 */}
-        <div
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            top: '10%',
-            left: '14%',
-            width: '40%',
-            height: '28%',
-            background: 'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.2) 75%, transparent 100%)',
-            transform: 'rotate(-25deg)',
-          }}
-        />
+        {style.symbol}
+      </span>
 
-        {/* 심볼 */}
+      {style.sub && size >= 50 && (
         <span
-          className="font-extrabold leading-none z-10 text-center tracking-tight drop-shadow-sm px-1 max-w-[90%] truncate"
+          className="font-semibold leading-none z-10 text-center tracking-tight mt-0.5 max-w-[85%] truncate"
           style={{
-            fontSize: `${symbolFontSize}px`,
+            fontSize: `${Math.max(8, Math.round(size * 0.115))}px`,
             color: style.textColor,
+            opacity: 0.85,
           }}
         >
-          {style.symbol}
+          {style.sub}
         </span>
+      )}
+    </span>
+  );
 
-        {/* 서브 레이블 */}
-        {style.sub && size >= 48 && (
-          <span
-            className="font-bold leading-none z-10 text-center tracking-tight mt-0.5 opacity-90 max-w-[85%] truncate"
-            style={{
-              fontSize: `${Math.max(7, Math.round(size * 0.12))}px`,
-              color: style.textColor,
-            }}
-          >
-            {style.sub}
-          </span>
-        )}
-      </div>
+  return (
+    <div
+      aria-hidden={decorative || undefined}
+      className={`relative inline-flex items-center justify-center select-none group ${className}`}
+    >
+      {isInteractive ? (
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={onRemove ? `${name} 챔버에서 제거` : name}
+          className="rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-400 focus-visible:outline-offset-2"
+        >
+          {tokenVisual}
+        </button>
+      ) : (
+        <div aria-label={decorative ? undefined : name} className="rounded-full">
+          {tokenVisual}
+        </div>
+      )}
 
-      {/* 제거 버튼 */}
       {onRemove && (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
           }}
-          className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-20"
+          aria-label={`${name} 제거`}
+          className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-slate-900 hover:bg-rose-600 text-slate-200 hover:text-white border border-slate-600 hover:border-rose-400 flex items-center justify-center transition-colors shadow-sm z-20 cursor-pointer focus-visible:outline-2 focus-visible:outline-sky-400"
         >
-          &times;
+          <X className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       )}
     </div>
   );
 };
-
