@@ -44,6 +44,7 @@ export function App() {
   const [combo, setCombo] = useState<number>(0);
   const [heat, setHeat] = useState<number>(0);
   const [chamberNudge, setChamberNudge] = useState<boolean>(false);
+  const [chamberEffect, setChamberEffect] = useState<'fission' | 'meltdown' | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => sound.enabled);
 
   // 모달 제어
@@ -52,21 +53,15 @@ export function App() {
   const [resultModal, setResultModal] = useState<ResultModalState | null>(null);
   const [resetCount, setResetCount] = useState<number>(0);
 
-  // 인라인 피드백 및 기록 로그
+  // 인라인 피드백
   const [feedback, setFeedback] = useState<FeedbackState>({
     text: `연구 과제 시작: [${initialStage.name}] — 목표 물질은 '${initialStage.target}'입니다.`,
     type: 'info',
   });
-  const [logs, setLogs] = useState<FeedbackState[]>([
-    {
-      text: `과제 시작: [${initialStage.name}] 목표 물질 '${initialStage.target}'`,
-      type: 'info',
-    },
-  ]);
 
-  const logContainerRef = useRef<HTMLElement | null>(null);
   const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const effectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStageList = STAGES[mode];
   const currentStage: Stage =
@@ -76,13 +71,13 @@ export function App() {
 
   const pushFeedback = (text: string, type: LogType = 'info') => {
     setFeedback({ text, type });
-    setLogs((prev) => [...prev.slice(-29), { text, type }]);
   };
 
   const resetStage = (lvl: number, targetMode: 'NORMAL' | 'HARDCORE') => {
     const targetStage =
       STAGES[targetMode].find((x) => x.level === lvl) || STAGES[targetMode][0];
     if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+    if (effectTimerRef.current) clearTimeout(effectTimerRef.current);
     setMode(targetMode);
     setLevel(targetStage.level);
     setInventory([...targetStage.items]);
@@ -90,6 +85,7 @@ export function App() {
     setTimeLeft(targetStage.timeLimit);
     setHeat(0);
     setCombo(0);
+    setChamberEffect(null);
     setIsSynthOpen(false);
     setIsCodexOpen(false);
     setResultModal(null);
@@ -100,7 +96,7 @@ export function App() {
     );
   };
 
-  // 1초 카운트다운 타이머 (결과 모달 표시 중에는 일시 정지)
+  // 1초 카운트다운 타이머 및 과열도 자연 냉각 (결과 모달 표시 중에는 일시 정지)
   useEffect(() => {
     if (resultModal) return;
 
@@ -119,24 +115,18 @@ export function App() {
         }
         return prev - 1;
       });
+      setHeat((prev) => (prev > 0 ? Math.max(0, prev - 1) : 0));
     }, 1000);
 
     return () => clearInterval(timer);
   }, [currentStage.name, resultModal]);
-
-  // 로그 자동 스크롤 (외부 뷰포트 스크롤 없이 로그 컨테이너 내부만 스크롤)
-  useEffect(() => {
-    const el = logContainerRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [logs]);
 
   // 언마운트 시 타이머 정리
   useEffect(() => {
     return () => {
       if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
       if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+      if (effectTimerRef.current) clearTimeout(effectTimerRef.current);
     };
   }, []);
 
@@ -149,6 +139,18 @@ export function App() {
     nudgeTimerRef.current = setTimeout(() => {
       setChamberNudge(false);
     }, 400);
+  };
+
+  const triggerChamberEffect = (effect: 'fission' | 'meltdown') => {
+    setChamberEffect(null);
+    requestAnimationFrame(() => {
+      setChamberEffect(effect);
+    });
+    if (effectTimerRef.current) clearTimeout(effectTimerRef.current);
+    effectTimerRef.current = setTimeout(
+      () => setChamberEffect(null),
+      effect === 'meltdown' ? 1200 : 1000,
+    );
   };
 
   const handleComboAdvance = (
@@ -235,10 +237,19 @@ export function App() {
       }
     });
 
-    // 사운드 및 절제된 챔버 피드백
+    // 사운드 및 챔버 이펙트
     if (rule.impactType !== 'normal') {
       sound.playExplosion(rule.impactType === 'nuke' ? 'nuke' : 'medium');
       triggerChamberNudge();
+      if (rule.impactType === 'nuke') {
+        triggerChamberEffect('fission');
+        void confetti({
+          particleCount: 38,
+          spread: 85,
+          origin: { y: 0.58 },
+          colors: ['#38bdf8', '#22d3ee', '#a3e635', '#f8fafc'],
+        });
+      }
     }
 
     // 과열도 계산 및 100% 멜트다운 처리
@@ -247,6 +258,13 @@ export function App() {
     if (nextHeat >= 100) {
       sound.playExplosion('nuke');
       triggerChamberNudge();
+      triggerChamberEffect('meltdown');
+      void confetti({
+        particleCount: 44,
+        spread: 95,
+        origin: { y: 0.58 },
+        colors: ['#f43f5e', '#fb923c', '#facc15', '#fde68a'],
+      });
       setHeat(0);
 
       if (currentStage.target === '코어 멜트다운') {
@@ -402,10 +420,36 @@ export function App() {
           {/* 반응 챔버 */}
           <section
             aria-label="반응 챔버"
-            className={`flex-1 min-h-[260px] bg-[#111827] border border-slate-800 rounded-xl p-3.5 lg:p-4 flex flex-col justify-between gap-3 overflow-hidden ${
-              chamberNudge ? 'chamber-nudge' : ''
+            className={`relative flex-1 min-h-[260px] bg-[#111827] border rounded-xl p-3.5 lg:p-4 flex flex-col justify-between gap-3 overflow-hidden transition-colors duration-300 ${
+              chamberEffect === 'meltdown'
+                ? 'border-rose-500/80 chamber-meltdown'
+                : chamberEffect === 'fission'
+                ? 'border-cyan-400/80 chamber-nudge'
+                : chamberNudge
+                ? 'border-slate-800 chamber-nudge'
+                : 'border-slate-800'
             }`}
           >
+            {chamberEffect === 'fission' && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-20 overflow-hidden rounded-xl"
+              >
+                <div className="effect-fission-glow absolute inset-0" />
+                <div className="effect-fission-ring absolute left-1/2 top-1/2 w-40 h-40 rounded-full border-2 border-cyan-300/90 shadow-[0_0_24px_rgba(34,211,238,0.65)]" />
+                <div className="effect-fission-ring-delayed absolute left-1/2 top-1/2 w-40 h-40 rounded-full border border-lime-300/75 opacity-0" />
+              </div>
+            )}
+            {chamberEffect === 'meltdown' && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-20 overflow-hidden rounded-xl"
+              >
+                <div className="effect-meltdown-glow absolute inset-0" />
+                <div className="effect-meltdown-ring absolute left-1/2 top-1/2 w-44 h-44 rounded-full border-2 border-rose-400/90 shadow-[0_0_28px_rgba(244,63,94,0.75)]" />
+                <div className="effect-meltdown-ring-delayed absolute left-1/2 top-1/2 w-44 h-44 rounded-full border border-amber-400/80 opacity-0" />
+              </div>
+            )}
             {/* 챔버 상단: 과열도 게이지 & 연속 반응 콤보 */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/80 shrink-0">
               <div className="flex items-center gap-2.5 flex-1 min-w-[220px]">
@@ -553,40 +597,6 @@ export function App() {
                 </button>
               </div>
             </div>
-          </section>
-
-          {/* 하단 실험 기록 로그 */}
-          <section
-            ref={logContainerRef}
-            aria-label="실험 기록"
-            className="h-20 bg-[#0d1422] border border-slate-800 rounded-xl px-3 py-2 flex flex-col gap-1 overflow-y-auto font-mono text-[11px] shrink-0"
-          >
-            {logs.map((log, i) => (
-              <div key={i} className="leading-normal flex items-start gap-2">
-                <span className="text-slate-400 shrink-0">
-                  {log.type === 'success'
-                    ? '[완료]'
-                    : log.type === 'danger'
-                    ? '[차단]'
-                    : log.type === 'warning'
-                    ? '[주의]'
-                    : '[안내]'}
-                </span>
-                <span
-                  className={
-                    log.type === 'success'
-                      ? 'text-emerald-300'
-                      : log.type === 'danger'
-                      ? 'text-rose-300'
-                      : log.type === 'warning'
-                      ? 'text-amber-300'
-                      : 'text-slate-300'
-                  }
-                >
-                  {log.text}
-                </span>
-              </div>
-            ))}
           </section>
         </main>
       </div>

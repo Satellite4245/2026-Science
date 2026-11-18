@@ -34,6 +34,89 @@ body {
   }
 }
 
+@keyframes fission-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.15);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes fission-glow {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes meltdown-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  15% { transform: translate3d(-4px, 2px, 0); }
+  30% { transform: translate3d(4px, -2px, 0); }
+  45% { transform: translate3d(-3px, -2px, 0); }
+  60% { transform: translate3d(3px, 2px, 0); }
+  75% { transform: translate3d(-2px, 1px, 0); }
+}
+
+@keyframes meltdown-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.8);
+    opacity: 0;
+  }
+}
+
+.effect-fission-glow {
+  background: radial-gradient(circle at center, rgba(56, 189, 248, 0.32) 0%, rgba(34, 211, 238, 0.12) 42%, transparent 72%);
+  animation: fission-glow 0.95s ease-out forwards;
+}
+
+.effect-fission-ring {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: fission-ring 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+.effect-fission-ring-delayed {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: fission-ring 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards;
+  }
+}
+
+.chamber-meltdown {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: meltdown-shake 0.48s ease-out;
+  }
+}
+
+.effect-meltdown-glow {
+  background: radial-gradient(circle at center, rgba(244, 63, 94, 0.36) 0%, rgba(251, 146, 60, 0.18) 45%, transparent 76%);
+  animation: fission-glow 1.15s ease-out forwards;
+}
+
+.effect-meltdown-ring {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: meltdown-ring 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+.effect-meltdown-ring-delayed {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: meltdown-ring 1.05s cubic-bezier(0.16, 1, 0.3, 1) 0.14s forwards;
+  }
+}
+
 /* Native <dialog> scroll containment and backdrop styling */
 dialog:modal {
   overscroll-behavior: contain;
