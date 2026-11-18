@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
+  BookOpen,
+  X,
 } from 'lucide-react';
 
 interface FeedbackState {
@@ -53,11 +55,16 @@ export function App() {
   const [resultModal, setResultModal] = useState<ResultModalState | null>(null);
   const [resetCount, setResetCount] = useState<number>(0);
 
-  // 인라인 피드백
+  // 인라인 피드백 및 직전 반응 과학 원리 노트
   const [feedback, setFeedback] = useState<FeedbackState>({
     text: `연구 과제 시작: [${initialStage.name}] — 목표 물질은 '${initialStage.target}'입니다.`,
     type: 'info',
   });
+  const [lastScienceNote, setLastScienceNote] = useState<{
+    reactionType: string;
+    equation: string;
+    sciencePoint: string;
+  } | null>(null);
 
   const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,6 +93,7 @@ export function App() {
     setHeat(0);
     setCombo(0);
     setChamberEffect(null);
+    setLastScienceNote(null);
     setIsSynthOpen(false);
     setIsCodexOpen(false);
     setResultModal(null);
@@ -291,6 +299,11 @@ export function App() {
     }
 
     setHeat(nextHeat);
+    setLastScienceNote({
+      reactionType: rule.reactionType,
+      equation: rule.equation,
+      sciencePoint: rule.sciencePoint,
+    });
     pushFeedback(rule.logMessage, rule.category === 'hazard' ? 'warning' : 'success');
 
     const afterCombo = handleComboAdvance(nextChamber, nextInventory);
@@ -341,6 +354,7 @@ export function App() {
       timeLeft,
       stars,
       tier,
+      scienceSummary: currentStage.scienceSummary,
     });
   };
 
@@ -561,6 +575,29 @@ export function App() {
                     : feedback.text}
                 </span>
               </div>
+
+              {lastScienceNote && (
+                <div className="px-3 py-2 rounded-lg border border-sky-900/50 bg-[#0d1422] text-xs flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <BookOpen className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0 leading-relaxed text-slate-300">
+                      <span className="inline-block text-[10px] font-semibold text-sky-300 bg-sky-950/80 border border-sky-800/60 px-1.5 py-0.5 rounded mr-1.5">
+                        {lastScienceNote.reactionType}
+                      </span>
+                      <span className="font-mono text-sky-200 mr-1.5">{lastScienceNote.equation}</span>
+                      <span className="text-slate-400">— {lastScienceNote.sciencePoint}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLastScienceNote(null)}
+                    aria-label="과학 원리 노트 닫기"
+                    className="p-0.5 rounded text-slate-500 hover:text-slate-300 transition-colors shrink-0 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
 
               {/* 챔버 제어 버튼군 */}
               <div className="flex flex-wrap items-center justify-center gap-2.5">

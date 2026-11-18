@@ -102,20 +102,29 @@ export const CodexModal: React.FC<CodexModalProps> = ({ isOpen, onClose }) => {
                     <span className="font-semibold text-slate-100 text-xs">
                       {index + 1}. {rule.title}
                     </span>
-                    {rule.heatDelta !== 0 && (
-                      <span
-                        className={`text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded ${
-                          rule.heatDelta < 0
-                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60'
-                            : 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
-                        }`}
-                      >
-                        과열 {rule.heatDelta > 0 ? `+${rule.heatDelta}%` : `${rule.heatDelta}%`}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-950/80 text-sky-300 border border-sky-800/60">
+                        {rule.reactionType}
                       </span>
-                    )}
+                      {rule.heatDelta !== 0 && (
+                        <span
+                          className={`text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded ${
+                            rule.heatDelta < 0
+                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60'
+                              : 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                          }`}
+                        >
+                          과열 {rule.heatDelta > 0 ? `+${rule.heatDelta}%` : `${rule.heatDelta}%`}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-sky-300 font-mono text-xs">{rule.equation}</div>
                   <p className="text-slate-400 text-xs leading-relaxed">{rule.description}</p>
+                  <p className="text-slate-300/90 text-[11px] leading-relaxed bg-[#0d1422]/80 border border-slate-800 rounded-lg px-2.5 py-1.5 mt-0.5">
+                    <span className="text-sky-400 font-semibold mr-1">원리:</span>
+                    {rule.sciencePoint}
+                  </p>
                 </div>
               ))}
             </div>
@@ -135,12 +144,21 @@ export const CodexModal: React.FC<CodexModalProps> = ({ isOpen, onClose }) => {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-rose-200 text-xs">{rule.title}</span>
-                    <span className="text-[11px] font-mono tabular-nums bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded">
-                      과열 +{rule.heatDelta}%
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-950/70 text-rose-200 border border-rose-800/60">
+                        {rule.reactionType}
+                      </span>
+                      <span className="text-[11px] font-mono tabular-nums bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded">
+                        과열 +{rule.heatDelta}%
+                      </span>
+                    </div>
                   </div>
                   <div className="text-amber-300 font-mono text-xs">{rule.equation}</div>
                   <p className="text-slate-300 text-xs leading-relaxed">{rule.description}</p>
+                  <p className="text-slate-300/90 text-[11px] leading-relaxed bg-[#0d1422]/80 border border-rose-900/40 rounded-lg px-2.5 py-1.5 mt-0.5">
+                    <span className="text-rose-300 font-semibold mr-1">원리:</span>
+                    {rule.sciencePoint}
+                  </p>
                 </div>
               ))}
             </div>

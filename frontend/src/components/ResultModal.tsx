@@ -8,6 +8,7 @@ export type ResultModalState =
       timeLeft: number;
       stars: string;
       tier: string;
+      scienceSummary?: string;
     }
   | {
       kind: 'course_complete';
@@ -16,6 +17,7 @@ export type ResultModalState =
       timeLeft: number;
       stars: string;
       tier: string;
+      scienceSummary?: string;
     }
   | {
       kind: 'timeout';
@@ -135,6 +137,12 @@ export const ResultModal: React.FC<ResultModalProps> = ({
               <div className="tabular-nums text-slate-400">남은 시간: {result.timeLeft}초</div>
               <div className="text-sky-300 font-semibold mt-0.5">{result.tier}</div>
             </div>
+            {result.scienceSummary && (
+              <div className="bg-[#0d1422] border border-sky-900/50 p-3 rounded-xl w-full text-left text-xs leading-relaxed text-slate-300">
+                <div className="text-[11px] font-semibold text-sky-400 mb-1">핵심 과학 개념</div>
+                {result.scienceSummary}
+              </div>
+            )}
             <button
               type="button"
               autoFocus
@@ -165,6 +173,12 @@ export const ResultModal: React.FC<ResultModalProps> = ({
               <div className="tabular-nums text-slate-400">남은 시간: {result.timeLeft}초</div>
               <div className="text-sky-300 font-semibold mt-0.5">{result.tier}</div>
             </div>
+            {result.scienceSummary && (
+              <div className="bg-[#0d1422] border border-sky-900/50 p-3 rounded-xl w-full text-left text-xs leading-relaxed text-slate-300">
+                <div className="text-[11px] font-semibold text-sky-400 mb-1">핵심 과학 개념</div>
+                {result.scienceSummary}
+              </div>
+            )}
             <div className="flex flex-col gap-2 w-full">
               {result.mode === 'NORMAL' && (
                 <button

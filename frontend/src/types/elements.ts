@@ -264,6 +264,7 @@ export interface Stage {
   timeLimit: number;
   desc: string;
   constraint: string;
+  scienceSummary: string;
   items: string[];
   steps: StageStep[];
 }
@@ -282,6 +283,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 120,
       desc: "염소와 나트륨을 결합해 염화나트륨(NaCl)을 만든 뒤, 물에 녹여 염화나트륨 수용액을 합성하세요.",
       constraint: "순서: Cl + Na → NaCl 합성 후 NaCl + H₂O 용해",
+      scienceSummary: "이온결합 물질(NaCl)이 극성 용매인 물(H₂O)과 만나면 수화 작용으로 양이온(Na⁺)과 음이온(Cl⁻)으로 해리되어 전류가 흐르는 전해질 수용액이 됩니다.",
       items: ["염소", "나트륨", "물"],
       steps: [
         { label: "염소(Cl) + 나트륨(Na) → 염화나트륨(NaCl)", checkItem: "염화나트륨" },
@@ -296,6 +298,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 120,
       desc: "수소 이온과 염소로 염산을, 나트륨과 수산화 이온으로 수산화나트륨을 만든 뒤 중화반응으로 물을 얻으세요.",
       constraint: "주의: 수산화 이온(OH⁻)은 단독으로 분해할 수 없습니다.",
+      scienceSummary: "산(H⁺)과 염기(OH⁻)가 만나 물(H₂O)과 염(NaCl)을 만드는 중화반응의 알짜 이온 반응식은 H⁺ + OH⁻ → H₂O이며 중화열을 방출합니다.",
       items: ["수소 이온", "염소", "나트륨", "수산화 이온"],
       steps: [
         { label: "수소 이온(H⁺) + 염소(Cl) → 염산(HCl)", checkItem: "염산" },
@@ -311,6 +314,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 150,
       desc: "화학 반응식 계수에 맞춰 이산화탄소(C + 2O)와 물(2H + O), 빛 에너지(C + 열에너지)를 만든 뒤 광합성으로 포도당을 합성하세요.",
       constraint: "계수 준수: C + 2O → CO₂ / 2H + O → H₂O (직접 포도당 조합 불가)",
+      scienceSummary: "화학 반응식의 계수는 반응하는 입자 수(몰수) 비를 나타냅니다. 광합성은 빛 에너지를 흡수해 무기물(CO₂, H₂O)을 유기물(포도당)로 전환하는 흡열 반응입니다.",
       items: ["탄소", "산소", "수소", "열에너지"],
       steps: [
         { label: "탄소 1 + 산소 2 → 이산화탄소(CO₂)", checkItem: "이산화탄소" },
@@ -327,6 +331,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 120,
       desc: "수소 2개와 산소 1개로 물을 합성한 뒤, 나트륨과 반응시켜 알칼리 폭발재를 얻으세요.",
       constraint: "계수: 수소(H) 2개 + 산소(O) 1개 → 물(H₂O) (과열 +35%)",
+      scienceSummary: "주기율표 1족 알칼리 금속(Na)은 반응성이 매우 커서 물과 격렬히 반응하며 수소 기체(H₂)와 강한 발열을 일으킵니다.",
       items: ["수소", "산소", "나트륨"],
       steps: [
         { label: "수소 2 + 산소 1 → 물(H₂O)", checkItem: "물" },
@@ -341,6 +346,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 90,
       desc: "수소 2개와 산소 1개, 열에너지를 함께 반응시켜 초고온 수증기를 생성하세요.",
       constraint: "조합: 수소(H) 2개 + 산소(O) 1개 + 열에너지(ΔH) (과열 +45%)",
+      scienceSummary: "발열 반응이라도 반응이 시작되려면 최소한의 활성화 에너지(점화 열)가 필요합니다. 수소 연소는 물만 생성하는 고발열 산화 반응입니다.",
       items: ["수소", "산소", "열에너지"],
       steps: [
         { label: "수소 2 + 산소 1 + 열에너지 → 초고온 수증기", checkItem: "초고온 수증기" },
@@ -354,6 +360,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 180,
       desc: "기초 물질들을 활용해 콤보가 끊기기 전에(8초 이내) 반응을 8회 연속 성공시켜 8콤보 마스터를 획득하세요.",
       constraint: "목표: 유효 반응 8회 연속 성공 시 '8콤보 마스터' 자동 생성",
+      scienceSummary: "용해(흡열, -10%)와 합성·중화(발열, +10~20%)를 적절히 번갈아 수행하면 열역학적 균형을 유지하면서 연속 반응을 이어갈 수 있습니다.",
       items: ALL_ITEMS_POOL,
       steps: [
         { label: "끊기지 않고 유효 반응 8회 연속 성공", checkItem: "8콤보 마스터" },
@@ -369,6 +376,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 180,
       desc: "상단의 원소 합성기에서 소립자(p, n, e)로 Na, Cl, H, O를 직접 조립한 뒤 염화나트륨 수용액을 만드세요.",
       constraint: "필수 도구: 상단 '원소 합성기'에서 Na·Cl·H·O 직접 합성",
+      scienceSummary: "원자의 종류는 양성자 수(원자번호)로 결정되며, 전기적으로 중성인 원자는 양성자 수와 전자 수가 같습니다(예: Na는 Z=11, 질량수 23).",
       items: ["양성자", "중성자", "전자"],
       steps: [
         { label: "원소 합성기에서 Na, Cl, H, O 조립", checkAllItems: ["나트륨", "염소", "수소", "산소"] },
@@ -384,6 +392,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 180,
       desc: "원소 합성기로 H⁺, Cl, Na, H, O를 조립해 수산화 이온(OH⁻), 염산, 수산화나트륨을 거쳐 중화반응으로 물을 얻으세요.",
       constraint: "주의: 수산화 이온 단독 분해 금지 / 입자 직접 조립 필수",
+      scienceSummary: "수소 원자(p:1, e:1)에서 전자를 잃으면 수소 이온(H⁺, p:1, e:0)이 됩니다. 이온의 전하량 차이를 이해하면 산·염기 중화반응을 예측할 수 있습니다.",
       items: ["양성자", "중성자", "전자"],
       steps: [
         { label: "원소 합성기에서 H⁺, Cl, Na, H, O 조립", checkAllItems: ["수소 이온", "염소", "나트륨", "수소", "산소"] },
@@ -400,6 +409,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 210,
       desc: "원소 합성기로 C, O, H를 조립하고 CO₂, 물, 빛 에너지를 생성한 뒤 광합성으로 포도당을 완성하세요.",
       constraint: "경로: CO₂ + H₂O + 빛 에너지 → 포도당 (직접 조합 불가)",
+      scienceSummary: "생명체를 구성하는 핵심 유기 원소(C, H, O)가 소립자 단계부터 조립되어 공유결합 분자(CO₂, H₂O)와 생체 에너지(포도당)로 진화하는 과정을 확인했습니다.",
       items: ["양성자", "중성자", "전자", "열에너지"],
       steps: [
         { label: "원소 합성기에서 탄소(C), 산소(O), 수소(H) 조립", checkAllItems: ["탄소", "산소", "수소"] },
@@ -415,6 +425,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 180,
       desc: "원소 합성기에서 우라늄-235(양성자 92, 중성자 143, 전자 92)를 합성하고 중성자(n⁰)를 충돌시켜 핵분열을 유도하세요.",
       constraint: "규격: p:92 / n:143 / e:92 (전자 충돌 핵분열 금지)",
+      scienceSummary: "원자핵은 양전하를 띠므로 전하가 없는 중성자(n⁰)만이 쿨롱 척력을 피하고 원자핵에 포획되어 ²³⁵U 핵분열 연쇄 반응을 일으킬 수 있습니다.",
       items: ["양성자", "중성자", "전자"],
       steps: [
         { label: "원소 합성기에서 ²³⁵U (p:92, n:143, e:92) 합성", checkItem: "우라늄-235" },
@@ -429,6 +440,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 150,
       desc: "양성자, 전자, 열에너지를 함께 반응시켜 고에너지 쌍소멸 반응으로 반물질 잔해를 생성하세요.",
       constraint: "조합: 양성자(p⁺) + 전자(e⁻) + 열에너지(ΔH) (과열 +50%)",
+      scienceSummary: "입자물리학에서 질량(m)과 에너지(E)는 등가(E=mc²)이며, 초고에너지 충돌 시 질량이 복사 에너지로 변환되는 과정을 탐구할 수 있습니다.",
       items: ["양성자", "중성자", "전자", "열에너지"],
       steps: [
         { label: "양성자 + 전자 + 열에너지 → 반물질 잔해", checkItem: "반물질 잔해" },
@@ -442,6 +454,7 @@ export const STAGES: Record<'NORMAL' | 'HARDCORE', Stage[]> = {
       timeLimit: 90,
       desc: "고에너지 발열 반응을 연속으로 실행해 챔버 과열도(HEAT)를 100%까지 폭주시켜 코어 멜트다운을 유도하세요.",
       constraint: "목표: 과열도 100% 도달 시 '코어 멜트다운' 자동 생성",
+      scienceSummary: "원자로 등에서 열발생 속도가 냉각 속도를 초과하면 열폭주(Thermal Runaway)가 발생해 노심 용융(코어 멜트다운)에 이르게 됩니다.",
       items: ["양성자", "중성자", "전자", "열에너지"],
       steps: [
         { label: "고에너지 반응 반복으로 과열도(HEAT) 100% 도달", checkItem: "코어 멜트다운" },
